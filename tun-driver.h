@@ -1,4 +1,6 @@
 #pragma once
+#include <net/if.h>
+
 /**
  * Create a new TUN adapter
  * @param dev       The new adapter's path
