@@ -3,7 +3,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <linux/if_tun.h>
+#include <limits.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,14 +11,21 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
+#ifdef __linux__
+#    include <linux/if_tun.h>
+#endif
+
+const uint16_t FRAME_LEN_MASK(0x7fff);
+const uint16_t FRAME_LENGTH(0x8000);
+
 struct CommDevices
 {
     int tapFileDescriptor;
     int serialFd;
 };
 
-char adapterName[IFNAMSIZ];
-char serialDevice[128];
+char adapterName[IFNAMSIZ] = {};
+char serialDevice[_POSIX_PATH_MAX] = {};
 
 static void *serialToTap(void *ptr);
 static void *tapToSerial(void *ptr);
@@ -26,19 +33,23 @@ static void *tapToSerial(void *ptr);
 /* Functions to read/write frames. */
 int frame_write(int fd, char *buf, size_t len)
 {
-    register char *ptr;
-    register int wlen;
+    char *ptr;
+    int wlen;
 
-    //TODO: prevent this hack with writev()! CK
+    // TODO: prevent this hack with writev()! CK
     ptr = buf - sizeof(uint16_t);
 
     *((uint16_t *)ptr) = htons(len);
-    len = (len & 0x07ff) + sizeof(uint16_t);
+    len = (len & FRAME_LEN_MASK) + sizeof(uint16_t);
 
     while (true) {
         if ((wlen = write(fd, ptr, len)) < 0) {
-            if (errno == EAGAIN || errno == EINTR) continue;
-            if (errno == ENOBUFS) return 0;
+            if (errno == EAGAIN || errno == EINTR) {
+                continue;
+            }
+            if (errno == ENOBUFS) {
+                return 0;
+            }
         }
 
         /* Even if we wrote only part of the frame we can't use second write
@@ -49,9 +60,10 @@ int frame_write(int fd, char *buf, size_t len)
 
 int frame_read(int fd, char *buf, size_t len)
 {
-    uint16_t hdr, flen;
+    uint16_t hdr;
+    uint16_t flen;
     struct iovec iv[2];
-    register int rlen;
+    int rlen;
 
     /* Read frame */
     iv[0].iov_len = sizeof(uint16_t);
@@ -61,15 +73,17 @@ int frame_read(int fd, char *buf, size_t len)
 
     while (true) {
         if ((rlen = readv(fd, iv, 2)) < 0) {
-            if (errno == EAGAIN || errno == EINTR)
+            if (errno == EAGAIN || errno == EINTR) {
                 continue;
-            else
-                return rlen;
+            }
+            return rlen;
         }
         hdr = ntohs(hdr);
-        flen = hdr & 0x07ff;
+        flen = hdr & FRAME_LEN_MASK;
 
-        if (rlen < 2 || (rlen - 2) != flen) return -1;
+        if (rlen < 2 || (rlen - 2) != flen) {
+            return -1;
+        }
 
         return hdr;
     }
@@ -88,7 +102,7 @@ static void *serialToTap(void *ptr)
     int tapFd = args->tapFileDescriptor;
     int serialFd = args->serialFd;
 
-    char inBuffer[2048];
+    char inBuffer[FRAME_LENGTH];
     size_t outSize = 0;
     int inIndex = 0;
 
@@ -105,7 +119,9 @@ static void *serialToTap(void *ptr)
         } else {
             // Write the packet to the virtual interface
             count = write(tapFd, inBuffer, serialResult);
-            if (count != serialResult) { perror("TAP write error!"); }
+            if (count != serialResult) {
+                perror("TAP write error!");
+            }
         }
     }
 
@@ -121,7 +137,7 @@ static void *tapToSerial(void *ptr)
     int serialFd = args->serialFd;
 
     // Create TAP buffer
-    char inBuffer[2048];
+    char inBuffer[FRAME_LENGTH];
 
     // Incoming byte count
     ssize_t count;
@@ -129,7 +145,8 @@ static void *tapToSerial(void *ptr)
 
     while (true) {
         // NOTE: we need space for fram length! CK
-        count = read(tapFd, inBuffer + sizeof(uint16_t), sizeof(inBuffer) - sizeof(uint16_t));
+        count = read(tapFd, inBuffer + sizeof(uint16_t),
+                     sizeof(inBuffer) - sizeof(uint16_t));
         if (count < 0) {
             perror("Could not read from TAP!");
             continue;
@@ -137,7 +154,9 @@ static void *tapToSerial(void *ptr)
 
         // Write to serial port
         serialResult = frame_write(serialFd, inBuffer, count);
-        if (serialResult < 0) { perror("Could not write to serial!"); }
+        if (serialResult < 0) {
+            perror("Could not write to serial!");
+        }
     }
 
     return ptr;
@@ -149,11 +168,15 @@ int main(int argc, char *argv[])
     int param;
     while ((param = getopt(argc, argv, "i:d:")) > 0) {
         switch (param) {
-        case 'i': strncpy(adapterName, optarg, IFNAMSIZ - 1); break;
+        case 'i':
+            strncpy(adapterName, optarg, IFNAMSIZ - 1);
+            break;
         case 'd':
             strncpy(serialDevice, optarg, sizeof(serialDevice) - 1);
             break;
-        default: fprintf(stderr, "Unknown parameter %c\n", param); break;
+        default:
+            fprintf(stderr, "Unknown parameter %c\n", param);
+            break;
         }
     }
 
@@ -166,7 +189,12 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+#ifdef __linux__
     int tapFd = tun_alloc(adapterName, IFF_TAP | IFF_NO_PI);
+#else
+    int tapFd = tun_alloc(adapterName, 0);
+#endif
+
     if (tapFd < 0) {
         fprintf(stderr, "Could not open /dev/net/tun\n");
         return EXIT_FAILURE;
@@ -180,8 +208,10 @@ int main(int argc, char *argv[])
     }
 
     // Create threads
-    pthread_t tap2serial, serial2tap;
-    int ret1, ret2;
+    pthread_t serial2tap;
+    pthread_t tap2serial;
+    int ret1;
+    int ret2;
 
     struct CommDevices threadParams;
     threadParams.tapFileDescriptor = tapFd;

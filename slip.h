@@ -5,12 +5,16 @@
 
 #pragma once
 
+#include <stdint.h>
 #include <stdio.h>
 
-#define SLIP_END 0xC0
-#define SLIP_ESC 0xDB
-#define SLIP_ESC_END 0xDC
-#define SLIP_ESC_ESC 0xDD
+enum
+{
+    SLIP_END = 0xC0,
+    SLIP_ESC = 0xDB,
+    SLIP_ESC_END = 0xDC,
+    SLIP_ESC_ESC = 0xDD,
+};
 
 enum slip_result
 {
@@ -33,8 +37,8 @@ extern "C"
      * @param outputSize        Where to store output length
      * @return SLIP_OK for success, otherwise error code
      */
-    enum slip_result slip_encode(const unsigned char *frame, size_t frameLength,
-                                 unsigned char *output, size_t maxOutputSize,
+    enum slip_result slip_encode(const uint8_t *frame, size_t frameLength,
+                                 uint8_t *output, size_t maxOutputSize,
                                  size_t *outputSize);
 
     /**
@@ -46,8 +50,8 @@ extern "C"
      * @param outputSize        Where to store output length
      * @return SLIP_OK for success, otherwise error code
      */
-    enum slip_result slip_decode(const unsigned char *encodedFrame,
-                                 size_t frameLength, unsigned char *output,
+    enum slip_result slip_decode(const uint8_t *encodedFrame,
+                                 size_t frameLength, uint8_t *output,
                                  size_t maxOutputSize, size_t *outputSize);
 
 #ifdef __cplusplus

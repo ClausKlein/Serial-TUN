@@ -17,14 +17,14 @@ MAKEFLAGS+= --no-builtin-rules
 checkAllHeader?='$(CURDIR)/.*'
 
 # NOTE: to many errors with boost::test
-CHECKS:='-*,cppcoreguidelines-*'
+CHECKS:='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoid-c-arrays'
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
 
 PROJECT_NAME:=$(shell basename $${PWD})
-#XXX CXX:=$(shell which clang++)
-BUILD_TYPE:=Coverage
+#NO! CXX:=$(shell which clang++)
+#XXX BUILD_TYPE:=Coverage
 BUILD_TYPE?=Debug
 BUILD_TYPE?=Release
 # GENERATOR:=Xcode
@@ -48,7 +48,7 @@ setup: $(BUILD_DIR) .clang-tidy compile_commands.json
 
 .configure-$(BUILD_TYPE): CMakeLists.txt
 	cd $(BUILD_DIR) && cmake -G $(GENERATOR) -Wdeprecated -Wdev \
-      -DUSE_LCOV=ON -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+      -DUSE_LCOV=off -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
       -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_CXX_COMPILER=${CXX} $(CURDIR)
 	touch $@
 

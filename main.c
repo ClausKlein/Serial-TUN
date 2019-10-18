@@ -1,8 +1,8 @@
 #include "slip.h"
 #include "tun-driver.h"
+#include <linux/if_tun.h>
 
 #include <libserialport.h>
-#include <linux/if_tun.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -142,12 +142,18 @@ int main(int argc, char *argv[])
     int param;
     while ((param = getopt(argc, argv, "i:p:b:")) > 0) {
         switch (param) {
-        case 'i': strncpy(adapterName, optarg, IFNAMSIZ - 1); break;
+        case 'i':
+            strncpy(adapterName, optarg, IFNAMSIZ - 1);
+            break;
         case 'p':
             strncpy(serialPortName, optarg, sizeof(serialPortName) - 1);
             break;
-        case 'b': serialBaudRate = atoi(optarg); break;
-        default: fprintf(stderr, "Unknown parameter %c\n", param); break;
+        case 'b':
+            serialBaudRate = atoi(optarg);
+            break;
+        default:
+            fprintf(stderr, "Unknown parameter %c\n", param);
+            break;
         }
     }
 
@@ -182,13 +188,21 @@ int main(int argc, char *argv[])
     if (status < 0) {
         fprintf(stderr, "Could not open serial port: ");
         switch (status) {
-        case SP_ERR_ARG: fprintf(stderr, "Invalid argument\n"); break;
-        case SP_ERR_FAIL: fprintf(stderr, "System error\n"); break;
-        case SP_ERR_MEM: fprintf(stderr, "Memory allocation error\n"); break;
+        case SP_ERR_ARG:
+            fprintf(stderr, "Invalid argument\n");
+            break;
+        case SP_ERR_FAIL:
+            fprintf(stderr, "System error\n");
+            break;
+        case SP_ERR_MEM:
+            fprintf(stderr, "Memory allocation error\n");
+            break;
         case SP_ERR_SUPP:
             fprintf(stderr, "Operation not supported by device\n");
             break;
-        default: fprintf(stderr, "Unknown error\n"); break;
+        default:
+            fprintf(stderr, "Unknown error\n");
+            break;
         }
         return EXIT_FAILURE;
     }

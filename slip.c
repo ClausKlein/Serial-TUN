@@ -1,16 +1,18 @@
 #include "slip.h"
 
-enum slip_result slip_encode(const unsigned char *frame, size_t frameLength,
-                             unsigned char *output, size_t maxOutputSize,
+enum slip_result slip_encode(const uint8_t *frame, size_t frameLength,
+                             uint8_t *output, size_t maxOutputSize,
                              size_t *outputSize)
 {
     size_t outputIndex = 0;
     for (size_t inIndex = 0; inIndex < frameLength; inIndex++) {
         // Check if we ran out of space on the output
-        if (maxOutputSize <= outputIndex) { return SLIP_BUFFER_OVERFLOW; }
+        if (maxOutputSize <= outputIndex) {
+            return SLIP_BUFFER_OVERFLOW;
+        }
 
         // Grab one byte from the input and check if we need to escape it
-        unsigned char c = frame[inIndex];
+        uint8_t c = frame[inIndex];
         switch (c) {
         case SLIP_END:
             output[outputIndex] = SLIP_ESC;
@@ -38,22 +40,28 @@ enum slip_result slip_encode(const unsigned char *frame, size_t frameLength,
     return SLIP_OK;
 }
 
-enum slip_result slip_decode(const unsigned char *encodedFrame,
-                             size_t frameLength, unsigned char *output,
-                             size_t maxOutputSize, size_t *outputSize)
+enum slip_result slip_decode(const uint8_t *encodedFrame, size_t frameLength,
+                             uint8_t *output, size_t maxOutputSize,
+                             size_t *outputSize)
 {
     int invalidEscape = 0;
 
     size_t outputIndex = 0;
     for (size_t inIndex = 0; inIndex < frameLength; inIndex++) {
         // Check if we ran out of space on the output buffer
-        if (maxOutputSize <= outputIndex) { return SLIP_BUFFER_OVERFLOW; }
+        if (maxOutputSize <= outputIndex) {
+            return SLIP_BUFFER_OVERFLOW;
+        }
 
-        unsigned char inByte = encodedFrame[inIndex];
+        uint8_t inByte = encodedFrame[inIndex];
         if (inByte == SLIP_ESC) {
             switch (encodedFrame[inIndex + 1]) {
-            case SLIP_ESC_END: output[outputIndex] = SLIP_END; break;
-            case SLIP_ESC_ESC: output[outputIndex] = SLIP_ESC; break;
+            case SLIP_ESC_END:
+                output[outputIndex] = SLIP_END;
+                break;
+            case SLIP_ESC_ESC:
+                output[outputIndex] = SLIP_ESC;
+                break;
             default:
                 // Escape sequence invalid, complain on stderr
                 output[outputIndex] = SLIP_ESC;
@@ -76,6 +84,8 @@ enum slip_result slip_decode(const unsigned char *encodedFrame,
     }
 
     *outputSize = outputIndex;
-    if (invalidEscape) { return SLIP_INVALID_ESCAPE; }
+    if (invalidEscape) {
+        return SLIP_INVALID_ESCAPE;
+    }
     return SLIP_OK;
 }

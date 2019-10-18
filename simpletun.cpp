@@ -22,10 +22,11 @@
  *   from https://backreference.org/2010/03/26/tuntap-interface-tutorial/ *
  *************************************************************************/
 
+#include <linux/if_tun.h>
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <linux/if_tun.h>
 #include <net/if.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -67,7 +68,9 @@ int tun_alloc(char *dev, int flags)
 
     ifr.ifr_flags = flags;
 
-    if (dev != nullptr && *dev != 0) { strncpy(ifr.ifr_name, dev, IFNAMSIZ); }
+    if (dev != nullptr && *dev != 0) {
+        strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+    }
 
     if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
         perror("ioctl(TUNSETIFF)");
@@ -75,7 +78,9 @@ int tun_alloc(char *dev, int flags)
         return err;
     }
 
-    if (dev != nullptr) { strcpy(dev, ifr.ifr_name); }
+    if (dev != nullptr) {
+        strcpy(dev, ifr.ifr_name);
+    }
 
     return fd;
 }
@@ -119,7 +124,9 @@ int read_n(int fd, char *buf, int n)
     int nread, left = n;
 
     while (left > 0) {
-        if ((nread = cread(fd, buf, left)) == 0) { return 0; }
+        if ((nread = cread(fd, buf, left)) == 0) {
+            return 0;
+        }
 
         left -= nread;
         buf += nread;
@@ -197,18 +204,34 @@ int main(int argc, char *argv[])
     /* Check command line options */
     while ((option = getopt(argc, argv, "i:sc:p:uahd")) > 0) {
         switch (option) {
-        case 'd': debug = true; break;
-        case 'h': usage(); break;
-        case 'i': strncpy(if_name, optarg, IFNAMSIZ - 1); break;
-        case 's': cliserv = SERVER; break;
+        case 'd':
+            debug = true;
+            break;
+        case 'h':
+            usage();
+            break;
+        case 'i':
+            strncpy(if_name, optarg, IFNAMSIZ - 1);
+            break;
+        case 's':
+            cliserv = SERVER;
+            break;
         case 'c':
             cliserv = CLIENT;
             strncpy(remote_ip, optarg, 15);
             break;
-        case 'p': port = strtoul(optarg, NULL, 10); break;
-        case 'u': flags = IFF_TUN; break;
-        case 'a': flags = IFF_TAP; break;
-        default: my_err("Unknown option %c\n", option); usage();
+        case 'p':
+            port = strtoul(optarg, NULL, 10);
+            break;
+        case 'u':
+            flags = IFF_TUN;
+            break;
+        case 'a':
+            flags = IFF_TAP;
+            break;
+        default:
+            my_err("Unknown option %c\n", option);
+            usage();
         }
     }
 
@@ -314,7 +337,9 @@ int main(int argc, char *argv[])
 
         ret = select(maxfd + 1, &rd_set, NULL, NULL, NULL);
 
-        if (ret < 0 && errno == EINTR) { continue; }
+        if (ret < 0 && errno == EINTR) {
+            continue;
+        }
 
         if (ret < 0) {
             perror("select()");

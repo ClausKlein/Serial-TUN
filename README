@@ -1,0 +1,12 @@
+Using the TUN/TAP driver to create a serial network connection
+==============================================================
+
+from Thanasis Georgiou
+
+http://thgeorgiou.com/posts/2017-03-20-usb-serial-network/
+
+see too:
+
+ - https://backreference.org/2010/03/26/tuntap-interface-tutorial/
+
+ - http://vtun.info

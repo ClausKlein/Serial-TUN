@@ -8,14 +8,18 @@ find_package(Threads REQUIRED)
 find_library(SerialPort_lib serialport)
 find_file(SerialPort_header libserialport.h)
 
-set(SOURCE_FILES main.c tun-driver.c tun-driver.h ${SerialPort_header} slip.c slip.h)
-add_executable(serial_tun ${SOURCE_FILES})
-target_link_libraries(serial_tun ${SerialPort_lib} ${CMAKE_THREAD_LIBS_INIT})
+if(SerialPort_lib)
+    set(SOURCE_FILES main.c tun-driver.c tun-driver.h ${SerialPort_header} slip.c slip.h)
+    add_executable(serial_tun ${SOURCE_FILES})
+    target_link_libraries(serial_tun ${SerialPort_lib} ${CMAKE_THREAD_LIBS_INIT})
+endif()
 
 add_executable(simpletap simpletap.cpp tun-driver.c tun-driver.h)
 target_link_libraries(simpletap ${CMAKE_THREAD_LIBS_INIT})
 
-add_executable(simpletun simpletun.cpp)
+if(LINUX)
+    add_executable(simpletun simpletun.cpp)
+endif()
 
 enable_testing()
 

@@ -5,15 +5,20 @@
 
 #include <string.h>
 
+const size_t BUF_MIN = 6;
+const size_t BUF_MAX = 8;
+const size_t BUF_LAST = 7;
+
 TEST_CASE("testDecode")
 {
+    // Decode the packet that is marked by SLIP_END
     {
-        unsigned char inBuffer[8] = {0, 1, 2, 3, 4, SLIP_END, 0xfe, 0xff};
-        unsigned char outBuffer[8] = {0};
+        uint8_t inBuffer[BUF_MAX] = {0, 1,        2,        3,
+                                     4, SLIP_END, INT8_MAX, UINT8_MAX};
+        uint8_t outBuffer[BUF_MAX] = {0};
         size_t outSize = 0;
-        int inIndex = 8;
+        int inIndex = BUF_MAX;  // NOTE: not index of SLIP_END! CK
 
-        // Decode the packet that is marked by SLIP_END
         enum slip_result result;
         result = slip_decode(inBuffer, inIndex, outBuffer, sizeof(outBuffer),
                              &outSize);
@@ -24,38 +29,36 @@ TEST_CASE("testDecode")
     }
 
     {
-        unsigned char inBuffer[16] = {
+        uint8_t inBuffer[BUF_MAX] = {
             0, 1, 2, 3, 4, SLIP_ESC, SLIP_ESC_END, SLIP_END};
-        unsigned char expected[16] = {0, 1, 2, 3, 4, SLIP_END};
-        unsigned char outBuffer[16] = {0};
+        uint8_t expected[BUF_MIN] = {0, 1, 2, 3, 4, SLIP_END};
+        uint8_t outBuffer[BUF_MAX] = {0};
         size_t outSize = 0;
-        int inIndex = 7;
+        int inIndex = sizeof(inBuffer);
 
-        // Decode the packet that is marked by SLIP_END
         enum slip_result result;
         result = slip_decode(inBuffer, inIndex, outBuffer, sizeof(outBuffer),
                              &outSize);
 
         CHECK(result == SLIP_OK);
-        CHECK(outSize == 6);
+        CHECK(outSize == BUF_MIN);
         CHECK(memcmp(expected, outBuffer, outSize) == 0);
     }
 
     {
-        unsigned char inBuffer[16] = {
+        uint8_t inBuffer[BUF_MAX] = {
             0, 1, 2, 3, 4, SLIP_ESC, SLIP_ESC_ESC, SLIP_END};
-        unsigned char expected[16] = {0, 1, 2, 3, 4, SLIP_ESC};
-        unsigned char outBuffer[16] = {0};
+        uint8_t expected[BUF_MIN] = {0, 1, 2, 3, 4, SLIP_ESC};
+        uint8_t outBuffer[BUF_MAX] = {0};
         size_t outSize = 0;
-        int inIndex = 7;
+        int inIndex = sizeof(inBuffer);
 
-        // Decode the packet that is marked by SLIP_END
         enum slip_result result;
         result = slip_decode(inBuffer, inIndex, outBuffer, sizeof(outBuffer),
                              &outSize);
 
         CHECK(result == SLIP_OK);
-        CHECK(outSize == 6);
+        CHECK(outSize == BUF_MIN);
         CHECK(memcmp(expected, outBuffer, outSize) == 0);
     }
 }
@@ -63,81 +66,80 @@ TEST_CASE("testDecode")
 TEST_CASE("testEncode")
 {
     {
-        unsigned char expected[16] = {0, 1, 2, 3, 4, SLIP_END};
-        unsigned char inBuffer[16] = {0, 1, 2, 3, 4};
-        unsigned char outBuffer[16] = {0};
+        uint8_t expected[BUF_MAX] = {0, 1, 2, 3, 4, SLIP_END};
+        uint8_t inBuffer[] = {0, 1, 2, 3, 4};
+        uint8_t outBuffer[BUF_MAX] = {0};
         size_t outSize = 0;
-        int length = 5;
+        int length = sizeof(inBuffer);
 
         enum slip_result result;
         result = slip_encode(inBuffer, length, outBuffer, sizeof(outBuffer),
                              &outSize);
 
         CHECK(result == SLIP_OK);
-        CHECK(outSize == 6);
+        CHECK(outSize == BUF_MIN);
         CHECK(memcmp(expected, outBuffer, outSize) == 0);
     }
 
     {
-        unsigned char expected[16] = {
+        uint8_t expected[BUF_MAX] = {
             0, 1, 2, 3, 4, SLIP_ESC, SLIP_ESC_END, SLIP_END};
-        unsigned char inBuffer[16] = {0, 1, 2, 3, 4, SLIP_END};
-        unsigned char outBuffer[16] = {0};
+        uint8_t inBuffer[BUF_MIN] = {0, 1, 2, 3, 4, SLIP_END};
+        uint8_t outBuffer[BUF_MAX] = {0};
         size_t outSize = 0;
-        int length = 6;
+        int length = sizeof(inBuffer);
 
         enum slip_result result;
         result = slip_encode(inBuffer, length, outBuffer, sizeof(outBuffer),
                              &outSize);
 
         CHECK(result == SLIP_OK);
-        CHECK(outSize == 8);
+        CHECK(outSize == BUF_MAX);
         CHECK(memcmp(expected, outBuffer, outSize) == 0);
     }
 
     {
-        unsigned char expected[16] = {
+        uint8_t expected[BUF_MAX] = {
             0, 1, 2, 3, 4, SLIP_ESC, SLIP_ESC_ESC, SLIP_END};
-        unsigned char inBuffer[16] = {0, 1, 2, 3, 4, SLIP_ESC};
-        unsigned char outBuffer[16] = {0};
+        uint8_t inBuffer[BUF_MIN] = {0, 1, 2, 3, 4, SLIP_ESC};
+        uint8_t outBuffer[BUF_MAX] = {0};
         size_t outSize = 0;
-        int length = 6;
+        int length = sizeof(inBuffer);
 
         enum slip_result result;
         result = slip_encode(inBuffer, length, outBuffer, sizeof(outBuffer),
                              &outSize);
 
         CHECK(result == SLIP_OK);
-        CHECK(outSize == 8);
+        CHECK(outSize == BUF_MAX);
         CHECK(memcmp(expected, outBuffer, outSize) == 0);
     }
 }
 
 TEST_CASE("testDecodeErrors")
 {
+    // Decode the packet that is marked by SLIP_END
     {
-        unsigned char inBuffer[8] = {0, 1,        2,        3,
+        uint8_t inBuffer[BUF_MAX] = {0, 1,        2,        3,
                                      4, SLIP_ESC, SLIP_ESC, SLIP_END};
-        unsigned char outBuffer[6] = {0};
+        uint8_t outBuffer[BUF_MIN] = {0};
         size_t outSize = 0;
-        int inIndex = 7;
+        int inIndex = BUF_LAST;
 
-        // Decode the packet that is marked by SLIP_END
         enum slip_result result;
         result = slip_decode(inBuffer, inIndex, outBuffer, sizeof(outBuffer),
                              &outSize);
 
         CHECK(result == SLIP_INVALID_ESCAPE);
-        CHECK(outSize == 6);
+        CHECK(outSize == BUF_MIN);
     }
 
     {
-        unsigned char inBuffer[6] = {0, 1, 2, 3, 4, SLIP_END};
-        unsigned char outBuffer[5] = {0};
+        uint8_t inBuffer[BUF_MIN] = {0, 1, 2, 3, 4, SLIP_END};
+        uint8_t outBuffer[BUF_MIN / 2] = {0};
         size_t outSize = 0;
-        int inIndex = 6;
+        int inIndex = BUF_LAST;
 
-        // Decode the packet that is marked by SLIP_END
         enum slip_result result;
         result = slip_decode(inBuffer, inIndex, outBuffer, sizeof(outBuffer),
                              &outSize);
@@ -149,11 +151,11 @@ TEST_CASE("testDecodeErrors")
 
 TEST_CASE("testEncodeErrors")
 {
-    unsigned char inBuffer[8] = {0,       1, 2, 3, 4, SLIP_ESC, SLIP_ESC_END,
+    uint8_t inBuffer[BUF_MAX] = {0,       1, 2, 3, 4, SLIP_ESC, SLIP_ESC_END,
                                  SLIP_END};
-    unsigned char outBuffer[5] = {0};
+    uint8_t outBuffer[BUF_MAX / 2] = {0};
     size_t outSize = 0;
-    int inIndex = 7;
+    int inIndex = BUF_LAST;
 
     enum slip_result result;
     result =
