@@ -17,9 +17,9 @@ MAKEFLAGS+= --no-builtin-rules
 checkAllHeader?='$(CURDIR)/.*'
 
 # NOTE: to many errors with boost::test
-CHECKS:='-*,cppcoreguidelines-*,-cppcoreguidelines-avoid-*,-cppcoreguidelines-pro-*'
-## CHECKS?='-*,portability-*,readability-*,-readability-braces-around-statements,-readability-implicit-bool-conversion,-readability-named-parameter'
-CHECKS?='-*,misc-*,boost-*,cert-*,-misc-unused-parameters'
+CHECKS:='-*,cppcoreguidelines-*'
+CHECKS?='-*,portability-*,readability-*'
+CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
 
 PROJECT_NAME:=$(shell basename $${PWD})

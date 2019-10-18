@@ -116,8 +116,8 @@ TEST_CASE("testEncode")
 TEST_CASE("testDecodeErrors")
 {
     {
-        unsigned char inBuffer[8] = {
-            0, 1, 2, 3, 4, SLIP_ESC, SLIP_ESC, SLIP_END};
+        unsigned char inBuffer[8] = {0, 1,        2,        3,
+                                     4, SLIP_ESC, SLIP_ESC, SLIP_END};
         unsigned char outBuffer[6] = {0};
         size_t outSize = 0;
         int inIndex = 7;
@@ -130,7 +130,7 @@ TEST_CASE("testDecodeErrors")
         CHECK(result == SLIP_INVALID_ESCAPE);
         CHECK(outSize == 6);
     }
-    
+
     {
         unsigned char inBuffer[6] = {0, 1, 2, 3, 4, SLIP_END};
         unsigned char outBuffer[5] = {0};
@@ -149,17 +149,16 @@ TEST_CASE("testDecodeErrors")
 
 TEST_CASE("testEncodeErrors")
 {
-    unsigned char inBuffer[8] = {
-        0, 1, 2, 3, 4, SLIP_ESC, SLIP_ESC_END, SLIP_END};
+    unsigned char inBuffer[8] = {0,       1, 2, 3, 4, SLIP_ESC, SLIP_ESC_END,
+                                 SLIP_END};
     unsigned char outBuffer[5] = {0};
     size_t outSize = 0;
     int inIndex = 7;
 
     enum slip_result result;
-    result = slip_encode(inBuffer, inIndex, outBuffer, sizeof(outBuffer),
-                         &outSize);
+    result =
+        slip_encode(inBuffer, inIndex, outBuffer, sizeof(outBuffer), &outSize);
 
     CHECK(result == SLIP_BUFFER_OVERFLOW);
     CHECK(outSize == 0);
 }
-

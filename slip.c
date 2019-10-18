@@ -76,6 +76,6 @@ enum slip_result slip_decode(const unsigned char *encodedFrame,
     }
 
     *outputSize = outputIndex;
-    if (invalidEscape) return SLIP_INVALID_ESCAPE;
+    if (invalidEscape) { return SLIP_INVALID_ESCAPE; }
     return SLIP_OK;
 }

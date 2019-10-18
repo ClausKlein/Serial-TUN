@@ -82,9 +82,9 @@ static void *serialToTun(void *ptr)
                            serialResult - i - 1);
                     inIndex = serialResult - i - 1;
                     break;
-                } else {
-                    inIndex++;
                 }
+
+                inIndex++;
             }
         }
     }

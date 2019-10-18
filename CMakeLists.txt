@@ -12,6 +12,10 @@ set(SOURCE_FILES main.c tun-driver.c tun-driver.h ${SerialPort_header} slip.c sl
 add_executable(serial_tun ${SOURCE_FILES})
 target_link_libraries(serial_tun ${SerialPort_lib} ${CMAKE_THREAD_LIBS_INIT})
 
+add_executable(simpletap simpletap.cpp tun-driver.c tun-driver.h)
+target_link_libraries(simpletap ${CMAKE_THREAD_LIBS_INIT})
+
+add_executable(simpletun simpletun.cpp)
 
 enable_testing()
 
