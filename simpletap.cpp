@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,8 +28,67 @@ struct CommDevices
 char adapterName[IFNAMSIZ] = {};
 char serialDevice[_POSIX_PATH_MAX] = {};
 
+/* IO cancelation */
+extern volatile bool __io_canceled;
+
+static inline void io_init() { __io_canceled = false; }
+
+static inline void io_cancel() { __io_canceled = true; }
+
+volatile bool __io_canceled = false;
+
 static void *serialToTap(void *ptr);
 static void *tapToSerial(void *ptr);
+
+static void signal_handler(int /*sig*/) { io_cancel(); }
+
+/* Read exactly len bytes (Signal safe)*/
+static inline int read_n(int fd, char *buf, size_t len)
+{
+    int res = 0;
+    int rlen;
+
+    while (!__io_canceled && len > 0) {
+        if ((rlen = read(fd, buf, len)) < 0) {
+            if (errno == EINTR || errno == EAGAIN) {
+                continue;
+            }
+            return -1;
+        }
+        if (!rlen)
+            return 0;
+
+        len -= rlen;
+        buf += rlen;
+        res += rlen;
+    }
+
+    return res;
+}
+
+/* Write exactly len bytes (Signal safe)*/
+static inline int write_n(int fd, char *buf, size_t len)
+{
+    int res = 0;
+    int wlen;
+
+    while (!__io_canceled && len > 0) {
+        if ((wlen = write(fd, buf, len)) < 0) {
+            if (errno == EINTR || errno == EAGAIN) {
+                continue;
+            }
+            return -1;
+        }
+        if (!wlen)
+            return 0;
+
+        len -= wlen;
+        buf += wlen;
+        res += wlen;
+    }
+
+    return res;
+}
 
 /* Functions to read/write frames. */
 int frame_write(int fd, char *buf, size_t len)
@@ -87,6 +147,23 @@ int frame_read(int fd, char *buf, size_t len)
 
         return hdr;
     }
+}
+
+/* Read N bytes with timeout */
+int readn_t(int fd, char *buf, size_t count, time_t timeout)
+{
+    fd_set fdset;
+    struct timeval tv;
+
+    tv.tv_usec = 0;
+    tv.tv_sec = timeout;
+
+    FD_ZERO(&fdset);
+    FD_SET(fd, &fdset);
+    if (select(fd + 1, &fdset, NULL, NULL, &tv) <= 0)
+        return -1;
+
+    return read_n(fd, buf, count);
 }
 
 /**
@@ -175,37 +252,43 @@ int main(int argc, char *argv[])
             strncpy(serialDevice, optarg, sizeof(serialDevice) - 1);
             break;
         default:
-            fprintf(stderr, "Unknown parameter %c\n", param);
-            break;
+            fprintf(stderr, "Usage: %s -i tun0 -d /dev/spidip2.0\n", *argv);
+            return EXIT_FAILURE;
         }
     }
 
-    if (adapterName[0] == '\0') {
-        fprintf(stderr, "Adapter name required (-i)\n");
-        return EXIT_FAILURE;
-    }
-    if (serialDevice[0] == '\0') {
-        fprintf(stderr, "Serial port required (-p)\n");
-        return EXIT_FAILURE;
-    }
-
 #ifdef __linux__
-    int tapFd = tun_alloc(adapterName, IFF_TAP | IFF_NO_PI);
-#else
-    int tapFd = tun_alloc(adapterName, 0);
+    if (adapterName[0] == '\0') {
+        fprintf(stderr, "Tuntap interface name required (-i)\n");
+        return EXIT_FAILURE;
+    }
 #endif
 
-    if (tapFd < 0) {
-        fprintf(stderr, "Could not open /dev/net/tun\n");
+    if (serialDevice[0] == '\0') {
+        fprintf(stderr, "Serial port required (-d)\n");
         return EXIT_FAILURE;
     }
 
-    int serialFd = open(serialDevice, O_RDWR);
+    int tapFd = tun_open_common(adapterName, MODE_TAP);
+    if (tapFd < 0) {
+        perror(adapterName);
+        fprintf(stderr, "Could not open tuntap interface!\n");
+        return EXIT_FAILURE;
+    }
+
+    int serialFd = open(serialDevice, O_RDWR | O_CLOEXEC);
     if (serialFd < 0) {
-        perror("Could not open serial port!");
+        perror(serialDevice);
+        fprintf(stderr, "Could not open serial port!\n");
         close(tapFd);
         return EXIT_FAILURE;
     }
+
+    // register signal handler
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = signal_handler;
+    sigaction(SIGHUP, &sa, NULL);
 
     // Create threads
     pthread_t serial2tap;

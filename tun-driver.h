@@ -1,6 +1,12 @@
 #pragma once
 #include <net/if.h>
 
+enum tun_mode_t
+{
+    MODE_TAP = 0,
+    MODE_TUN = 1,
+};
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -9,10 +15,10 @@ extern "C"
     /**
      * Create a new TUN adapter
      * @param dev       The new adapter's path
-     * @param flags     The new adapter's flag
+     * @param istun     The new adapter's mode
      * @return The file descriptor to communicate with the device
      */
-    int tun_alloc(char dev[IFNAMSIZ], short flags);
+    int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t istun);
 
 #ifdef __cplusplus
 }

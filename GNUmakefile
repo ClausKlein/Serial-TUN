@@ -17,7 +17,8 @@ MAKEFLAGS+= --no-builtin-rules
 checkAllHeader?='$(CURDIR)/.*'
 
 # NOTE: to many errors with boost::test
-CHECKS:='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoid-c-arrays'
+CHECKS:='-cppcoreguidelines-avoid-c-arrays,-modernize-avoid-c-arrays,-modernize-deprecated-headers,-modernize-use-trailing-return-type'
+CHECKS?='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoid-c-arrays'
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 

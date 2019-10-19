@@ -17,7 +17,7 @@ TEST_CASE("testDecode")
                                      4, SLIP_END, INT8_MAX, UINT8_MAX};
         uint8_t outBuffer[BUF_MAX] = {0};
         size_t outSize = 0;
-        int inIndex = BUF_MAX;  // NOTE: not index of SLIP_END! CK
+        int inIndex = BUF_MAX; // NOTE: not index of SLIP_END! CK
 
         enum slip_result result;
         result = slip_decode(inBuffer, inIndex, outBuffer, sizeof(outBuffer),

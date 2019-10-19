@@ -1,5 +1,6 @@
 #include "tun-driver.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <net/if.h>
@@ -11,7 +12,7 @@
 #ifdef __linux__
 #    include <linux/if_tun.h>
 
-int tun_alloc(char dev[IFNAMSIZ], short flags)
+int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t istun)
 {
     // Interface request structure
     struct ifreq ifr;
@@ -28,7 +29,7 @@ int tun_alloc(char dev[IFNAMSIZ], short flags)
 
     // Initialize the ifreq structure with 0s and the set flags
     memset(&ifr, 0, sizeof(ifr));
-    ifr.ifr_flags = flags;
+    ifr.ifr_flags = (istun ? IFF_TUN : IFF_TAP) | IFF_NO_PI;
 
     // If a device name is passed we should add it to the ifreq struct
     // Otherwise the kernel will try to allocate the next available
@@ -56,7 +57,7 @@ int tun_alloc(char dev[IFNAMSIZ], short flags)
 
 #else
 
-int tun_alloc(char dev[IFNAMSIZ], short flags)
+int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t istun)
 {
     char tunname[_POSIX_NAME_MAX];
 
@@ -65,15 +66,26 @@ int tun_alloc(char dev[IFNAMSIZ], short flags)
         return open(tunname, O_RDWR);
     }
 
+    int err = 0;
     for (int i = 0; i < INT8_MAX; i++) {
         int fd;
-        snprintf(tunname, sizeof(tunname), "/dev/tun%d", i);
+        snprintf(tunname, sizeof(tunname), "/dev/%s%d", (istun ? "tun" : "tap"),
+                 i);
         /* Open device */
         if ((fd = open(tunname, O_RDWR)) > 0) {
-            sprintf(dev, "tun%d", i);
+            strcpy(dev, tunname + 5);
             return fd;
         }
+
+        if (errno != ENOENT) {
+            err = errno;
+        } else if (i) {
+            break; /* don't try all devices */
+        }
     }
+    if (err)
+        errno = err;
+
     return -1;
 }
 #endif
