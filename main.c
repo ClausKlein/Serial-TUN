@@ -1,6 +1,5 @@
 #include "slip.h"
 #include "tun-driver.h"
-#include <linux/if_tun.h>
 
 #include <libserialport.h>
 #include <pthread.h>
@@ -166,7 +165,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    int tunFd = tun_alloc(adapterName, IFF_TUN | IFF_NO_PI);
+    int tunFd = tun_open_common(adapterName, VTUN_P2P);
     if (tunFd < 0) {
         fprintf(stderr, "Could not open /dev/net/tun\n");
         return EXIT_FAILURE;

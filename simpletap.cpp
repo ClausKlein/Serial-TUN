@@ -9,12 +9,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/uio.h>
 #include <unistd.h>
-
-#ifdef __linux__
-#    include <linux/if_tun.h>
-#endif
 
 const uint16_t FRAME_LEN_MASK(0x7fff);
 const uint16_t FRAME_LENGTH(0x8000);
@@ -31,7 +28,7 @@ char serialDevice[_POSIX_PATH_MAX] = {};
 /* IO cancelation */
 extern volatile bool __io_canceled;
 
-static inline void io_init() { __io_canceled = false; }
+static inline bool io_is_enabled() { return !__io_canceled; }
 
 static inline void io_cancel() { __io_canceled = true; }
 
@@ -90,20 +87,39 @@ static inline int write_n(int fd, char *buf, size_t len)
     return res;
 }
 
+/*
+ * Create pipe. Return open fd.
+ */
+inline int pipe_open(int *fd)
+{
+    return socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
+}
+
+/* Write frames to pipe */
+inline int pipe_write(int fd, char *buf, int len)
+{
+    return write_n(fd, buf, len);
+}
+
+/* Read frames from pipe */
+inline int pipe_read(int fd, char *buf, int len) { return read(fd, buf, len); }
+
 /* Functions to read/write frames. */
 int frame_write(int fd, char *buf, size_t len)
 {
-    char *ptr;
-    int wlen;
+    struct iovec iv[2];
+    size_t flen = (len & FRAME_LEN_MASK) + sizeof(uint16_t);
+    uint16_t hdr = htons(len);
 
-    // TODO: prevent this hack with writev()! CK
-    ptr = buf - sizeof(uint16_t);
+    /* Write frame */
+    iv[0].iov_len = sizeof(uint16_t);
+    iv[0].iov_base = (char *)&hdr;
+    iv[1].iov_len = len;
+    iv[1].iov_base = buf;
 
-    *((uint16_t *)ptr) = htons(len);
-    len = (len & FRAME_LEN_MASK) + sizeof(uint16_t);
-
-    while (true) {
-        if ((wlen = write(fd, ptr, len)) < 0) {
+    while (io_is_enabled()) {
+        int wlen;
+        if ((wlen = writev(fd, iv, 2)) < 0) {
             if (errno == EAGAIN || errno == EINTR) {
                 continue;
             }
@@ -112,16 +128,22 @@ int frame_write(int fd, char *buf, size_t len)
             }
         }
 
+        // NOTE: sizeof(uint16_t) == 2;
+        if (wlen < 2 || (wlen - 2) != len) {
+            fprintf(stderr, "writev() returned %d! flen=%d\n", wlen, flen);
+            return -1;
+        }
+
         /* Even if we wrote only part of the frame we can't use second write
          * since it will produce another frame */
         return wlen;
     }
+    return 0;
 }
 
 int frame_read(int fd, char *buf, size_t len)
 {
     uint16_t hdr;
-    uint16_t flen;
     struct iovec iv[2];
     int rlen;
 
@@ -131,22 +153,25 @@ int frame_read(int fd, char *buf, size_t len)
     iv[1].iov_len = len;
     iv[1].iov_base = buf;
 
-    while (true) {
+    while (io_is_enabled()) {
         if ((rlen = readv(fd, iv, 2)) < 0) {
             if (errno == EAGAIN || errno == EINTR) {
                 continue;
             }
-            return rlen;
+            //NO! return rlen;
         }
         hdr = ntohs(hdr);
-        flen = hdr & FRAME_LEN_MASK;
+        uint16_t flen = hdr & FRAME_LEN_MASK;
 
+        // NOTE: sizeof(uint16_t) == 2;
         if (rlen < 2 || (rlen - 2) != flen) {
+            fprintf(stderr, "readv() returned %d! flen=%d\n", rlen, flen);
             return -1;
         }
 
         return hdr;
     }
+    return 0;
 }
 
 /* Read N bytes with timeout */
@@ -187,7 +212,7 @@ static void *serialToTap(void *ptr)
     size_t count;
     ssize_t serialResult;
 
-    while (true) {
+    while (io_is_enabled()) {
         // Read bytes from serial
         serialResult = frame_read(serialFd, &inBuffer[0], sizeof(inBuffer));
 
@@ -220,10 +245,8 @@ static void *tapToSerial(void *ptr)
     ssize_t count;
     int serialResult;
 
-    while (true) {
-        // NOTE: we need space for fram length! CK
-        count = read(tapFd, inBuffer + sizeof(uint16_t),
-                     sizeof(inBuffer) - sizeof(uint16_t));
+    while (io_is_enabled()) {
+        count = read(tapFd, inBuffer, sizeof(inBuffer));
         if (count < 0) {
             perror("Could not read from TAP!");
             continue;
@@ -241,9 +264,11 @@ static void *tapToSerial(void *ptr)
 
 int main(int argc, char *argv[])
 {
+    enum tun_mode_t mode = VTUN_ETHER;
+
     // Grab parameters
     int param;
-    while ((param = getopt(argc, argv, "i:d:")) > 0) {
+    while ((param = getopt(argc, argv, "i:d:p")) > 0) {
         switch (param) {
         case 'i':
             strncpy(adapterName, optarg, IFNAMSIZ - 1);
@@ -251,8 +276,12 @@ int main(int argc, char *argv[])
         case 'd':
             strncpy(serialDevice, optarg, sizeof(serialDevice) - 1);
             break;
+        case 'p':
+            mode = VTUN_PIPE;
+            break;
         default:
-            fprintf(stderr, "Usage: %s -i tun0 -d /dev/spidip2.0\n", *argv);
+            fprintf(stderr, "Usage: %s -i tun0 -d /dev/spidip2.0 [-p]\n",
+                    *argv);
             return EXIT_FAILURE;
         }
     }
@@ -269,19 +298,38 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    int tapFd = tun_open_common(adapterName, MODE_TAP);
+    int fd[2] = {-1, -1};
+    if (mode == VTUN_PIPE) {
+        if (pipe_open(fd) < 0) {
+            fprintf(stderr, "Can't create pipe. %s(%d)", strerror(errno),
+                    errno);
+            return EXIT_FAILURE;
+        }
+    }
+
+    int tapFd = tun_open_common(adapterName, VTUN_ETHER);
     if (tapFd < 0) {
         perror(adapterName);
         fprintf(stderr, "Could not open tuntap interface!\n");
-        return EXIT_FAILURE;
+        if (mode != VTUN_PIPE) {
+            return EXIT_FAILURE;
+        }
+        fprintf(stderr, "Test mode, use VTUN_PIPE first end!\n");
+        tapFd = fd[0];
     }
 
     int serialFd = open(serialDevice, O_RDWR | O_CLOEXEC);
     if (serialFd < 0) {
         perror(serialDevice);
         fprintf(stderr, "Could not open serial port!\n");
-        close(tapFd);
-        return EXIT_FAILURE;
+        if (mode != VTUN_PIPE) {
+            close(tapFd);
+            return EXIT_FAILURE;
+        }
+        fprintf(stderr, "Test mode, use VTUN_PIPE second end!\n");
+        serialFd = fd[1];
+        char pingMsg[] = "Ping";
+        frame_write(serialFd, pingMsg, sizeof(pingMsg));
     }
 
     // register signal handler

@@ -12,7 +12,7 @@
 #ifdef __linux__
 #    include <linux/if_tun.h>
 
-int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t istun)
+int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t mode)
 {
     // Interface request structure
     struct ifreq ifr;
@@ -29,7 +29,7 @@ int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t istun)
 
     // Initialize the ifreq structure with 0s and the set flags
     memset(&ifr, 0, sizeof(ifr));
-    ifr.ifr_flags = (istun ? IFF_TUN : IFF_TAP) | IFF_NO_PI;
+    ifr.ifr_flags = (mode ? IFF_TUN : IFF_TAP) | IFF_NO_PI;
 
     // If a device name is passed we should add it to the ifreq struct
     // Otherwise the kernel will try to allocate the next available
@@ -57,7 +57,7 @@ int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t istun)
 
 #else
 
-int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t istun)
+int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t mode)
 {
     char tunname[_POSIX_NAME_MAX];
 
@@ -69,7 +69,7 @@ int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t istun)
     int err = 0;
     for (int i = 0; i < INT8_MAX; i++) {
         int fd;
-        snprintf(tunname, sizeof(tunname), "/dev/%s%d", (istun ? "tun" : "tap"),
+        snprintf(tunname, sizeof(tunname), "/dev/%s%d", (mode ? "tun" : "tap"),
                  i);
         /* Open device */
         if ((fd = open(tunname, O_RDWR)) > 0) {
@@ -79,12 +79,13 @@ int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t istun)
 
         if (errno != ENOENT) {
             err = errno;
-        } else if (i) {
+        } else if (i > 0) {
             break; /* don't try all devices */
         }
     }
-    if (err)
+    if (err) {
         errno = err;
+    }
 
     return -1;
 }
