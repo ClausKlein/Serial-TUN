@@ -37,7 +37,11 @@ volatile bool __io_canceled = false;
 static void *serialToTap(void *ptr);
 static void *tapToSerial(void *ptr);
 
-static void signal_handler(int /*sig*/) { io_cancel(); }
+static void signal_handler(int sig)
+{
+    fprintf(stderr, "signal_handler() called with sig(%d)\n", sig);
+    io_cancel();
+}
 
 /* Read exactly len bytes (Signal safe)*/
 static inline int read_n(int fd, char *buf, size_t len)
@@ -52,8 +56,9 @@ static inline int read_n(int fd, char *buf, size_t len)
             }
             return -1;
         }
-        if (!rlen)
+        if (!rlen) {
             return 0;
+        }
 
         len -= rlen;
         buf += rlen;
@@ -76,8 +81,9 @@ static inline int write_n(int fd, char *buf, size_t len)
             }
             return -1;
         }
-        if (!wlen)
+        if (!wlen) {
             return 0;
+        }
 
         len -= wlen;
         buf += wlen;
@@ -120,7 +126,7 @@ int frame_write(int fd, char *buf, size_t len)
     while (io_is_enabled()) {
         int wlen;
         if ((wlen = writev(fd, iv, 2)) < 0) {
-            if (errno == EAGAIN || errno == EINTR) {
+            if (io_is_enabled() && (errno == EAGAIN || errno == EINTR)) {
                 continue;
             }
             if (errno == ENOBUFS) {
@@ -155,10 +161,10 @@ int frame_read(int fd, char *buf, size_t len)
 
     while (io_is_enabled()) {
         if ((rlen = readv(fd, iv, 2)) < 0) {
-            if (errno == EAGAIN || errno == EINTR) {
+            if (io_is_enabled() && (errno == EAGAIN || errno == EINTR)) {
                 continue;
             }
-            //NO! return rlen;
+            // NO! return rlen;
         }
         hdr = ntohs(hdr);
         uint16_t flen = hdr & FRAME_LEN_MASK;
@@ -185,8 +191,9 @@ int readn_t(int fd, char *buf, size_t count, time_t timeout)
 
     FD_ZERO(&fdset);
     FD_SET(fd, &fdset);
-    if (select(fd + 1, &fdset, NULL, NULL, &tv) <= 0)
+    if (select(fd + 1, &fdset, NULL, NULL, &tv) <= 0) {
         return -1;
+    }
 
     return read_n(fd, buf, count);
 }
@@ -227,7 +234,7 @@ static void *serialToTap(void *ptr)
         }
     }
 
-    return ptr;
+    return NULL;
 }
 
 static void *tapToSerial(void *ptr)
@@ -259,7 +266,7 @@ static void *tapToSerial(void *ptr)
         }
     }
 
-    return ptr;
+    return NULL;
 }
 
 int main(int argc, char *argv[])
@@ -314,6 +321,7 @@ int main(int argc, char *argv[])
         if (mode != VTUN_PIPE) {
             return EXIT_FAILURE;
         }
+
         fprintf(stderr, "Test mode, use VTUN_PIPE first end!\n");
         tapFd = fd[0];
     }
@@ -326,6 +334,7 @@ int main(int argc, char *argv[])
             close(tapFd);
             return EXIT_FAILURE;
         }
+
         fprintf(stderr, "Test mode, use VTUN_PIPE second end!\n");
         serialFd = fd[1];
         char pingMsg[] = "Ping";
@@ -336,7 +345,11 @@ int main(int argc, char *argv[])
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = signal_handler;
-    sigaction(SIGHUP, &sa, NULL);
+    sigaction(SIGHUP, &sa, NULL);   // terminal line hangup (1)
+    sigaction(SIGQUIT, &sa, NULL);  // quit program (3)
+    // TODO sigaction(SIGPIPE, SIG_IGN, NULL); // timer expired (14)
+    sigaction(SIGTERM, &sa, NULL);  // software termination signal (15)
+    // NO! XXX sigaction(SIGALRM, &sa, NULL);
 
     // Create threads
     pthread_t serial2tap;
@@ -354,12 +367,50 @@ int main(int argc, char *argv[])
     ret2 =
         pthread_create(&serial2tap, NULL, serialToTap, (void *)&threadParams);
 
+    if (mode == VTUN_PIPE) {
+        char msg[] = "Ping\n";
+        pipe_write(1, msg, sizeof(msg)); // stdout
+        if (readn_t(0, msg, sizeof(msg), 3) < 0) {
+            fprintf(stderr, "Timeout while read from stdin\n");
+        }
+        signal_handler(3);
+        alarm(1); // NOTE: XXX send unhandled SIGALRM after 1 sec! CK
+    }
+
     pthread_join(tap2serial, NULL);
-    printf("Thread tap-to-network returned %d\n", ret1);
+    fprintf(stderr, "Thread tap-to-network returned %d\n", ret1);
     pthread_join(serial2tap, NULL);
-    printf("Thread network-to-tap returned %d\n", ret2);
+    fprintf(stderr, "Thread network-to-tap returned %d\n", ret2);
 
     close(tapFd);
     close(serialFd);
     return EXIT_SUCCESS;
 }
+
+/***
+Claus-MBP:Serial-TUN clausklein$ timeout -s 1 5 ../.build-Serial-TUN-Debug/simpletap -d /dev/XXX -p
+No such file or directory
+Could not open tuntap interface!
+Test mode, use VTUN_PIPE first end!
+/dev/XXX: No such file or directory
+Could not open serial port!
+Test mode, use VTUN_PIPE second end!
+Starting threads
+Ping
+Timeout while read from stdin
+signal_handler() called with sig(3)
+Alarm clock: 14
+Claus-MBP:Serial-TUN clausklein$ timeout -s 1 5 ../.build-Serial-TUN-Debug/simpletap -d /dev/XXX -p
+No such file or directory
+Could not open tuntap interface!
+Test mode, use VTUN_PIPE first end!
+/dev/XXX: No such file or directory
+Could not open serial port!
+Test mode, use VTUN_PIPE second end!
+Starting threads
+Ping
+Pong
+signal_handler() called with sig(1)
+signal_handler() called with sig(3)
+Claus-MBP:Serial-TUN clausklein$
+***/
