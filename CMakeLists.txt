@@ -1,8 +1,20 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.13)
 project(serial_tun LANGUAGES C CXX)
 
+#---------------------------------------------------------------------------------------
+# Compiler config
+#---------------------------------------------------------------------------------------
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS ON)
 set(CMAKE_C_FLAGS "-Wall -Wextra -Wpedantic")
+
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_FLAGS ${CMAKE_C_FLAGS})
+
+list(APPEND CMAKE_MODULE_PATH /usr/local/lib/cmake)
 
 find_package(Threads REQUIRED)
 find_library(SerialPort_lib serialport)
@@ -14,42 +26,85 @@ if(SerialPort_lib)
     target_link_libraries(serial_tun ${SerialPort_lib} ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
-add_executable(simpletap simpletap.cpp tun-driver.cpp tun-driver.h)
-target_link_libraries(simpletap ${CMAKE_THREAD_LIBS_INIT})
-set_target_properties(simpletap PROPERTIES CXX_STANDARD 14)
-add_test(simpletap0 COMMAND ./simpletap -d /dev/XXX -i tap0 -p)
-add_test(simpletapPipe COMMAND ./simpletap -d /dev/XXX -p)
-
 if(LINUX)
     add_executable(simpletun simpletun.cpp)
 endif()
 
-enable_testing()
-
-find_package(doctest 2.3.4 REQUIRED)
-
-add_executable(test_slip test_slip.cpp slip.cpp slip.h)
-target_link_libraries(test_slip PRIVATE doctest::doctest)
-set_target_properties(test_slip PROPERTIES CXX_STANDARD 14)
-add_test(test_slip test_slip)
-
-list(APPEND CMAKE_MODULE_PATH $ENV{HOME}/Workspace/cmake)
-list(APPEND CMAKE_MODULE_PATH $ENV{HOME}/cmake)
-option(USE_LCOV "Use GNU Test Coverage framework" OFF)
-if(USE_LCOV)
-    set(CMAKE_BUILD_TYPE "Coverage" CACHE STRING "build for lcov" FORCE)
+#---------------------------------------------------------------------------------------
+# Set SERIAL_TUN_MASTER_PROJECT to ON if we are building Serial-TUN
+#---------------------------------------------------------------------------------------
+# Check if Serial-TUN is being used directly or via add_subdirectory, but allow overriding
+if(NOT SERIAL_TUN_MASTER_PROJECT)
+    if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+        message(STATUS "${CMAKE_CURRENT_SOURCE_DIR} == ${CMAKE_SOURCE_DIR} => SERIAL_TUN_MASTER_PROJECT")
+        set(SERIAL_TUN_MASTER_PROJECT ON)
+    else()
+        set(SERIAL_TUN_MASTER_PROJECT OFF)
+    endif()
 endif()
 
-if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
-    include(CodeCoverage)
+include(FetchContent)
 
-    set(COVERAGE_EXCLUDES '/usr/local/*' '/Applications/Xcode.app/*' '/opt/local/*')
-    setup_target_for_coverage(
-         NAME lcov      # NAME for custom target.
-         EXECUTABLE ctest     # EXECUTABLE of the test driver executable that runs the tests.
-                   # NOTE! This should always have a ZERO as exit code
-                   # otherwise the coverage generation will not complete.
-        #XXX coverage   # Name of output directory.
+if(SERIAL_TUN_MASTER_PROJECT)
+    FetchContent_Declare(
+        spdlog
+        GIT_REPOSITORY https://github.com/gabime/spdlog.git
+        GIT_TAG        v1.4.2
     )
-endif() #CMAKE_BUILD_TYPE STREQUAL "Coverage"
+#
+# NOTE: works only with cmakeV3.14.1: FetchContent_MakeAvailable(spdlog)
+#
+endif()
 
+add_executable(simpletap simpletap.cpp tun-driver.cpp tun-driver.h)
+target_link_libraries(simpletap ${CMAKE_THREAD_LIBS_INIT})
+set_target_properties(simpletap PROPERTIES CXX_STANDARD 14)
+
+# testing options
+option(SERIAL_TUN_BUILD_TESTS "Build tests" ${SERIAL_TUN_MASTER_PROJECT})
+    if(SERIAL_TUN_BUILD_TESTS)
+    enable_testing()
+
+    #NO! find_package(doctest 2.3.5 REQUIRED)
+    FetchContent_Declare(
+        doctest
+        GIT_REPOSITORY https://github.com/onqtam/doctest.git
+        GIT_TAG        2.3.5
+    )
+
+    FetchContent_GetProperties(doctest)
+    if(NOT doctest_POPULATED)
+        FetchContent_Populate(doctest)
+        add_subdirectory(${doctest_SOURCE_DIR} ${doctest_BINARY_DIR})
+    endif()
+
+    add_test(NAME simpletap0 COMMAND simpletap -d /dev/XXX -i tap0 -p)
+    add_test(NAME simpletapPipe COMMAND simpletap -d /dev/XXX -p)
+
+    add_executable(test_slip test_slip.cpp slip.cpp slip.h)
+    target_link_libraries(test_slip PRIVATE doctest::doctest)
+    set_target_properties(test_slip PROPERTIES CXX_STANDARD 14)
+    add_test(test_slip test_slip)
+
+
+    # test coverage options
+    list(APPEND CMAKE_MODULE_PATH $ENV{HOME}/Workspace/cmake)
+    list(APPEND CMAKE_MODULE_PATH $ENV{HOME}/cmake)
+    option(USE_LCOV "Use GNU Test Coverage framework" OFF)
+    if(USE_LCOV)
+        set(CMAKE_BUILD_TYPE "Coverage" CACHE STRING "build for lcov" FORCE)
+    endif()
+
+    if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+        include(CodeCoverage)
+
+        set(COVERAGE_EXCLUDES '${FETCHCONTENT_BASE_DIR}/* /usr/local/*' '/Applications/Xcode.app/*' '/opt/local/*')
+        setup_target_for_coverage(
+             lcov      # NAME for custom target.
+             ctest     # EXECUTABLE of the test driver executable that runs the tests.
+                       # NOTE! This should always have a ZERO as exit code
+                       # otherwise the coverage generation will not complete.
+            coverage   # Name of output directory.
+        )
+    endif() #CMAKE_BUILD_TYPE STREQUAL "Coverage"
+endif()

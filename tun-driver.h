@@ -19,7 +19,7 @@ extern "C"
      * @param mode      The new adapter's mode
      * @return The file descriptor to communicate with the device
      */
-    int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t mode);
+    int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode);
 
 #ifdef __cplusplus
 }

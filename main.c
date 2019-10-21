@@ -14,9 +14,9 @@ struct CommDevices
     struct sp_port *serialPort;
 };
 
-char adapterName[IFNAMSIZ];
+char adapterName[IF_NAMESIZE];
 char serialPortName[128];
-int serialBaudRate = 9600;
+unsigned serialBaudRate = 9600;
 
 static void *serialToTun(void *ptr);
 static void *tunToSerial(void *ptr);
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
             strncpy(serialPortName, optarg, sizeof(serialPortName) - 1);
             break;
         case 'b':
-            serialBaudRate = atoi(optarg);
+            serialBaudRate = strtoul(optarg, NULL, 10);
             break;
         default:
             fprintf(stderr, "Unknown parameter %c\n", param);

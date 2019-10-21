@@ -16,13 +16,19 @@
 const uint16_t FRAME_LEN_MASK(0x7fff);
 const uint16_t FRAME_LENGTH(0x8000);
 
+#ifndef NODEBUG
+#define wait1Sec() sleep(1)
+#else
+#define wait1Sec() while(false)
+#endif
+
 struct CommDevices
 {
     int tapFileDescriptor;
     int serialFd;
 };
 
-char adapterName[IFNAMSIZ] = {};
+char adapterName[IF_NAMESIZE] = {};
 char serialDevice[_POSIX_PATH_MAX] = {};
 
 /* IO cancelation */
@@ -102,19 +108,19 @@ inline int pipe_open(int *fd)
 }
 
 /* Write frames to pipe */
-inline int pipe_write(int fd, char *buf, int len)
+inline ssize_t pipe_write(int fd, char *buf, int len)
 {
     return write_n(fd, buf, len);
 }
 
 /* Read frames from pipe */
-inline int pipe_read(int fd, char *buf, int len) { return read(fd, buf, len); }
+inline ssize_t pipe_read(int fd, char *buf, int len) { return read(fd, buf, len); }
 
 /* Functions to read/write frames. */
-int frame_write(int fd, char *buf, size_t len)
+ssize_t frame_write(int fd, char *buf, size_t len)
 {
     struct iovec iv[2];
-    size_t flen = (len & FRAME_LEN_MASK) + sizeof(uint16_t);
+    ssize_t flen = (len & FRAME_LEN_MASK) + sizeof(uint16_t);
     uint16_t hdr = htons(len);
 
     /* Write frame */
@@ -124,7 +130,7 @@ int frame_write(int fd, char *buf, size_t len)
     iv[1].iov_base = buf;
 
     while (io_is_enabled()) {
-        int wlen;
+        ssize_t wlen;
         if ((wlen = writev(fd, iv, 2)) < 0) {
             if (errno == EAGAIN || errno == EINTR) {
                 perror("writev()");
@@ -133,11 +139,13 @@ int frame_write(int fd, char *buf, size_t len)
             if (errno == ENOBUFS) {
                 return 0;
             }
+            return wlen;
         }
 
         // NOTE: sizeof(uint16_t) == 2;
-        if (wlen < 2 || (wlen - 2) != len) {
-            fprintf(stderr, "writev() returned %d! flen=%zu\n", wlen, flen);
+        if (wlen < 2 || (wlen - 2) != (ssize_t)len) {
+            fprintf(stderr, "writev() returned len=%ld! flen=%lu\n", wlen, flen);
+            errno = EBADMSG;
             return -1;
         }
 
@@ -148,11 +156,10 @@ int frame_write(int fd, char *buf, size_t len)
     return 0;
 }
 
-int frame_read(int fd, char *buf, size_t len)
+ssize_t frame_read(int fd, char *buf, size_t len)
 {
     uint16_t hdr;
     struct iovec iv[2];
-    int rlen;
 
     /* Read frame */
     iv[0].iov_len = sizeof(uint16_t);
@@ -161,19 +168,22 @@ int frame_read(int fd, char *buf, size_t len)
     iv[1].iov_base = buf;
 
     while (io_is_enabled()) {
+        ssize_t rlen;
         if ((rlen = readv(fd, iv, 2)) < 0) {
             if (errno == EAGAIN || errno == EINTR) {
                 perror("readv()");
                 continue;
             }
-            // NO! return rlen;
+            return rlen;
         }
+
         hdr = ntohs(hdr);
-        uint16_t flen = hdr & FRAME_LEN_MASK;
+        ssize_t flen = hdr & FRAME_LEN_MASK;
 
         // NOTE: sizeof(uint16_t) == 2;
         if (rlen < 2 || (rlen - 2) != flen) {
-            fprintf(stderr, "readv() returned %d! flen=%d\n", rlen, flen);
+            fprintf(stderr, "readv() returned %ld! flen=%ld\n", rlen, flen);
+            errno = EBADMSG;
             return -1;
         }
 
@@ -209,38 +219,37 @@ static void *serialToTap(void *ptr)
 {
     // Grab thread parameters
     struct CommDevices *args = (struct CommDevices *)ptr;
-
     int tapFd = args->tapFileDescriptor;
     int serialFd = args->serialFd;
 
     char inBuffer[FRAME_LENGTH];
-    size_t outSize = 0;
-    int inIndex = 0;
-
-    // Incoming byte count
-    size_t count;
-    ssize_t serialResult;
 
     while (io_is_enabled()) {
         // Read bytes from serial
-        serialResult = frame_read(serialFd, &inBuffer[0], sizeof(inBuffer));
+        // Incoming byte count
+        ssize_t serialResult = frame_read(serialFd, &inBuffer[0], sizeof(inBuffer));
         if (serialResult <= 0) {
             perror("Serial read error!");
+            wait1Sec();
             continue;
         }
 
         // Write the packet to the virtual interface
-        count = write(tapFd, inBuffer, serialResult);
+        ssize_t count = write(tapFd, inBuffer, serialResult);
         if (count != serialResult) {
             perror("TAP write error!");
+            wait1Sec();
             continue;
         }
 
-        printf("%s\n", inBuffer); // debug TRACE only! CK
+#ifndef NODEBUG
+        fprintf(stderr, "%s\n", inBuffer); // debug TRACE only! CK
         sleep(1);
+#endif
+
     }
 
-    printf("serialToTap thread stopped\n");
+    fprintf(stderr, "serialToTap thread stopped\n");
     return NULL;
 }
 
@@ -248,36 +257,37 @@ static void *tapToSerial(void *ptr)
 {
     // Grab thread parameters
     struct CommDevices *args = (struct CommDevices *)ptr;
-
     int tapFd = args->tapFileDescriptor;
     int serialFd = args->serialFd;
 
     // Create TAP buffer
     char inBuffer[FRAME_LENGTH];
 
-    // Incoming byte count
-    ssize_t count;
-    int serialResult;
-
     while (io_is_enabled()) {
-        count = read(tapFd, inBuffer, sizeof(inBuffer));
+        // Incoming byte count
+        ssize_t count = read(tapFd, inBuffer, sizeof(inBuffer));
         if (count <= 0) {
             perror("Could not read from TAP!");
+            wait1Sec();
             continue;
         }
 
         // Write to serial port
-        serialResult = frame_write(serialFd, inBuffer, count);
+        ssize_t serialResult = frame_write(serialFd, inBuffer, count);
         if (serialResult < 0) {
             perror("Could not write to serial!");
+            wait1Sec();
             continue;
         }
 
-        printf("%s\n", inBuffer); // debug TRACE only! CK
+#ifndef NODEBUG
+        fprintf(stderr, "%s\n", inBuffer); // debug TRACE only! CK
         sleep(1);
+#endif
+
     }
 
-    printf("tapToSerial thread stopped\n");
+    fprintf(stderr, "tapToSerial thread stopped\n");
     return NULL;
 }
 
@@ -290,7 +300,7 @@ int main(int argc, char *argv[])
     while ((param = getopt(argc, argv, "i:d:p")) > 0) {
         switch (param) {
         case 'i':
-            strncpy(adapterName, optarg, IFNAMSIZ - 1);
+            strncpy(adapterName, optarg, IF_NAMESIZE - 1);
             break;
         case 'd':
             strncpy(serialDevice, optarg, sizeof(serialDevice) - 1);
@@ -305,7 +315,7 @@ int main(int argc, char *argv[])
         }
     }
 
-#ifdef __linux__
+#if defined(__linux__) && defined(NOT_YET)
     if (adapterName[0] == '\0') {
         fprintf(stderr, "Tuntap interface name required (-i)\n");
         return EXIT_FAILURE;
@@ -326,7 +336,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    int tapFd = tun_open_common(adapterName, VTUN_ETHER);
+    int tapFd = tun_open_common(adapterName, mode);
     if (tapFd < 0) {
         perror(adapterName);
         fprintf(stderr, "Could not open tuntap interface!\n");
@@ -337,7 +347,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Test mode, use VTUN_PIPE first end!\n");
         tapFd = fd[0];
         char pingMsg[] = "Ping";
-        int len = frame_write(tapFd, pingMsg, sizeof(pingMsg));
+        ssize_t len = frame_write(tapFd, pingMsg, sizeof(pingMsg));
         if (len <= 0) {
             perror("frame_write Ping");
         }
@@ -355,7 +365,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Test mode, use VTUN_PIPE second end!\n");
         serialFd = fd[1];
         char pingMsg[] = "Pong";
-        int len = frame_write(serialFd, pingMsg, sizeof(pingMsg));
+        ssize_t len = frame_write(serialFd, pingMsg, sizeof(pingMsg));
         if (len <= 0) {
             perror("frame_write Pong");
         }
@@ -379,7 +389,7 @@ int main(int argc, char *argv[])
     threadParams.tapFileDescriptor = tapFd;
     threadParams.serialFd = serialFd;
 
-    printf("Starting threads\n");
+    fprintf(stderr, "Starting threads\n");
     do {
         int err = pthread_create(&tap2serial, NULL, tapToSerial,
                                  (void *)&threadParams);
@@ -399,7 +409,7 @@ int main(int argc, char *argv[])
         if (mode == VTUN_PIPE) {
             sleep(2);
 
-            char msg[] = "Ping\n";
+            char msg[] = "Hallo\n";
             pipe_write(1, msg, sizeof(msg)); // stdout
             if (readn_t(0, msg, sizeof(msg), 3) < 0) {
                 fprintf(stderr, "Timeout while read from stdin\n");

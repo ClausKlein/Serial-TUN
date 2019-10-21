@@ -44,7 +44,7 @@ test: all
 
 
 check: setup .configure-$(BUILD_TYPE) compile_commands.json
-	run-clang-tidy.py -header-filter=$(checkAllHeader) -checks=$(CHECKS) | tee run-clang-tidy.log 2>&1
+	run-clang-tidy.py -header-filter=$(checkAllHeader) -checks=$(CHECKS) *.c *.cpp | tee run-clang-tidy.log 2>&1
 	egrep '\b(warning|error):' run-clang-tidy.log | perl -pe 's/(^.*) (warning|error):/\2/' | sort -u
 
 setup: $(BUILD_DIR) .clang-tidy compile_commands.json

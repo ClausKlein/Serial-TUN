@@ -12,8 +12,12 @@
 #ifdef __linux__
 #    include <linux/if_tun.h>
 
-int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t mode)
+int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
 {
+    if ((mode != IFF_TUN) || (mode != IFF_TAP)) {
+        return -1;
+    }
+
     // Interface request structure
     struct ifreq ifr;
 
@@ -35,7 +39,7 @@ int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t mode)
     // Otherwise the kernel will try to allocate the next available
     // device of the given type
     if (*dev) {
-        strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+        strncpy(ifr.ifr_name, dev, IF_NAMESIZE);
     }
 
     // Ask the kernel to create the new device
@@ -57,8 +61,12 @@ int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t mode)
 
 #else
 
-int tun_open_common(char dev[IFNAMSIZ], enum tun_mode_t mode)
+int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
 {
+    if ((mode != IFF_TUN) || (mode != IFF_TAP)) {
+        return -1;
+    }
+
     char tunname[_POSIX_NAME_MAX];
 
     if (*dev) {
