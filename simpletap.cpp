@@ -17,9 +17,9 @@ const uint16_t FRAME_LEN_MASK(0x7fff);
 const uint16_t FRAME_LENGTH(0x8000);
 
 #ifndef NODEBUG
-#define wait1Sec() sleep(1)
+#    define wait1Sec() sleep(1)
 #else
-#define wait1Sec() while(false)
+#    define wait1Sec() while (false)
 #endif
 
 struct CommDevices
@@ -114,7 +114,10 @@ inline ssize_t pipe_write(int fd, char *buf, int len)
 }
 
 /* Read frames from pipe */
-inline ssize_t pipe_read(int fd, char *buf, int len) { return read(fd, buf, len); }
+inline ssize_t pipe_read(int fd, char *buf, int len)
+{
+    return read(fd, buf, len);
+}
 
 /* Functions to read/write frames. */
 ssize_t frame_write(int fd, char *buf, size_t len)
@@ -144,7 +147,8 @@ ssize_t frame_write(int fd, char *buf, size_t len)
 
         // NOTE: sizeof(uint16_t) == 2;
         if (wlen < 2 || (wlen - 2) != (ssize_t)len) {
-            fprintf(stderr, "writev() returned len=%ld! flen=%lu\n", wlen, flen);
+            fprintf(stderr, "writev() returned len=%ld! flen=%lu\n", wlen,
+                    flen);
             errno = EBADMSG;
             return -1;
         }
@@ -227,7 +231,8 @@ static void *serialToTap(void *ptr)
     while (io_is_enabled()) {
         // Read bytes from serial
         // Incoming byte count
-        ssize_t serialResult = frame_read(serialFd, &inBuffer[0], sizeof(inBuffer));
+        ssize_t serialResult =
+            frame_read(serialFd, &inBuffer[0], sizeof(inBuffer));
         if (serialResult <= 0) {
             perror("Serial read error!");
             wait1Sec();
@@ -246,7 +251,6 @@ static void *serialToTap(void *ptr)
         fprintf(stderr, "%s\n", inBuffer); // debug TRACE only! CK
         sleep(1);
 #endif
-
     }
 
     fprintf(stderr, "serialToTap thread stopped\n");
@@ -284,7 +288,6 @@ static void *tapToSerial(void *ptr)
         fprintf(stderr, "%s\n", inBuffer); // debug TRACE only! CK
         sleep(1);
 #endif
-
     }
 
     fprintf(stderr, "tapToSerial thread stopped\n");

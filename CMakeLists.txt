@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.14.1)
 project(serial_tun LANGUAGES C CXX)
 
 #---------------------------------------------------------------------------------------
@@ -46,37 +46,36 @@ endif()
 include(FetchContent)
 
 if(SERIAL_TUN_MASTER_PROJECT)
-    FetchContent_Declare(
+    fetchcontent_declare(
         spdlog
         GIT_REPOSITORY https://github.com/gabime/spdlog.git
         GIT_TAG        v1.4.2
     )
-#
-# NOTE: works only with cmakeV3.14.1: FetchContent_MakeAvailable(spdlog)
-#
+    fetchcontent_makeavailable(spdlog)
 endif()
 
 add_executable(simpletap simpletap.cpp tun-driver.cpp tun-driver.h)
-target_link_libraries(simpletap ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(simpletap PRIVATE spdlog::spdlog ${CMAKE_THREAD_LIBS_INIT})
 set_target_properties(simpletap PROPERTIES CXX_STANDARD 14)
 
 # testing options
 option(SERIAL_TUN_BUILD_TESTS "Build tests" ${SERIAL_TUN_MASTER_PROJECT})
-    if(SERIAL_TUN_BUILD_TESTS)
+if(SERIAL_TUN_BUILD_TESTS)
     enable_testing()
 
-    #NO! find_package(doctest 2.3.5 REQUIRED)
-    FetchContent_Declare(
+#NO! find_package(doctest 2.3.5 REQUIRED)
+    fetchcontent_declare(
         doctest
         GIT_REPOSITORY https://github.com/onqtam/doctest.git
         GIT_TAG        2.3.5
     )
-
-    FetchContent_GetProperties(doctest)
-    if(NOT doctest_POPULATED)
-        FetchContent_Populate(doctest)
-        add_subdirectory(${doctest_SOURCE_DIR} ${doctest_BINARY_DIR})
-    endif()
+    fetchcontent_makeavailable(doctest)
+#OR
+#   fetchcontent_getproperties(doctest)
+#   if(NOT doctest_POPULATED)
+#       fetchcontent_populate(doctest)
+#       add_subdirectory(${doctest_SOURCE_DIR} ${doctest_BINARY_DIR})
+#   endif()
 
     add_test(NAME simpletap0 COMMAND simpletap -d /dev/XXX -i tap0 -p)
     add_test(NAME simpletapPipe COMMAND simpletap -d /dev/XXX -p)
@@ -98,13 +97,16 @@ option(SERIAL_TUN_BUILD_TESTS "Build tests" ${SERIAL_TUN_MASTER_PROJECT})
     if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
         include(CodeCoverage)
 
-        set(COVERAGE_EXCLUDES '${FETCHCONTENT_BASE_DIR}/* /usr/local/*' '/Applications/Xcode.app/*' '/opt/local/*')
+        set(COVERAGE_EXCLUDES
+            '${FETCHCONTENT_BASE_DIR}/*' '/usr/local/*'
+            '/Applications/Xcode.app/*' '/opt/local/*'
+        )
         setup_target_for_coverage(
-             lcov      # NAME for custom target.
-             ctest     # EXECUTABLE of the test driver executable that runs the tests.
-                       # NOTE! This should always have a ZERO as exit code
-                       # otherwise the coverage generation will not complete.
-            coverage   # Name of output directory.
+            NAME lcov   # NAME for custom target.
+            EXECUTABLE ctest    # EXECUTABLE of the test driver executable that runs the tests.
+                        # NOTE! This should always have a ZERO as exit code
+                        # otherwise the coverage generation will not complete.
+            #NO! coverage   # Name of output directory.
         )
     endif() #CMAKE_BUILD_TYPE STREQUAL "Coverage"
 endif()

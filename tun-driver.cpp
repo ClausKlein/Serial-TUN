@@ -14,7 +14,7 @@
 
 int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
 {
-    if ((mode != IFF_TUN) || (mode != IFF_TAP)) {
+    if ((mode != VTUN_ETHER) || (mode != VTUN_P2P)) {
         return -1;
     }
 
@@ -63,7 +63,7 @@ int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
 
 int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
 {
-    if ((mode != IFF_TUN) || (mode != IFF_TAP)) {
+    if ((mode != VTUN_ETHER) || (mode != VTUN_P2P)) {
         return -1;
     }
 
