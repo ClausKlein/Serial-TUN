@@ -1,6 +1,14 @@
 #include "tun-driver.h"
 
+#define SPDLOG_LEVEL_TRACE 0
+#define SPDLOG_LEVEL_DEBUG 1
+#define SPDLOG_LEVEL_INFO 2 // default log level
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+#include "spdlog/spdlog.h"
+#include "spdlog/fmt/bin_to_hex.h"
+
 #include <arpa/inet.h>
+#include <array>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -19,7 +27,7 @@ const uint16_t FRAME_LENGTH(0x8000);
 #ifndef NODEBUG
 #    define wait1Sec() sleep(1)
 #else
-#    define wait1Sec() while (false)
+#    define wait1Sec() (void)0
 #endif
 
 struct CommDevices
@@ -45,7 +53,7 @@ static void *tapToSerial(void *ptr);
 
 static void signal_handler(int sig)
 {
-    fprintf(stderr, "signal_handler() called with sig(%d)\n", sig);
+    SPDLOG_INFO("signal_handler() called with sig={}", sig);
     io_cancel();
 }
 
@@ -58,6 +66,7 @@ static inline int read_n(int fd, char *buf, size_t len)
     while (!__io_canceled && len > 0) {
         if ((rlen = read(fd, buf, len)) < 0) {
             if (errno == EINTR || errno == EAGAIN) {
+                SPDLOG_DEBUG("EAGAIN|EINTR = read()");
                 continue;
             }
             return -1;
@@ -83,6 +92,7 @@ static inline int write_n(int fd, char *buf, size_t len)
     while (!__io_canceled && len > 0) {
         if ((wlen = write(fd, buf, len)) < 0) {
             if (errno == EINTR || errno == EAGAIN) {
+                SPDLOG_DEBUG("EAGAIN|EINTR = write()");
                 continue;
             }
             return -1;
@@ -136,10 +146,11 @@ ssize_t frame_write(int fd, char *buf, size_t len)
         ssize_t wlen;
         if ((wlen = writev(fd, iv, 2)) < 0) {
             if (errno == EAGAIN || errno == EINTR) {
-                perror("writev()");
+                SPDLOG_DEBUG("EAGAIN|EINTR = writev()");
                 continue;
             }
             if (errno == ENOBUFS) {
+                SPDLOG_DEBUG("ENOBUFS = writev()");
                 return 0;
             }
             return wlen;
@@ -147,8 +158,7 @@ ssize_t frame_write(int fd, char *buf, size_t len)
 
         // NOTE: sizeof(uint16_t) == 2;
         if (wlen < 2 || (wlen - 2) != (ssize_t)len) {
-            fprintf(stderr, "writev() returned len=%ld! flen=%lu\n", wlen,
-                    flen);
+            SPDLOG_ERROR("writev() returned len={} flen={}", wlen, flen);
             errno = EBADMSG;
             return -1;
         }
@@ -175,7 +185,7 @@ ssize_t frame_read(int fd, char *buf, size_t len)
         ssize_t rlen;
         if ((rlen = readv(fd, iv, 2)) < 0) {
             if (errno == EAGAIN || errno == EINTR) {
-                perror("readv()");
+                SPDLOG_DEBUG("EAGAIN|EINTR = readv()");
                 continue;
             }
             return rlen;
@@ -186,7 +196,7 @@ ssize_t frame_read(int fd, char *buf, size_t len)
 
         // NOTE: sizeof(uint16_t) == 2;
         if (rlen < 2 || (rlen - 2) != flen) {
-            fprintf(stderr, "readv() returned %ld! flen=%ld\n", rlen, flen);
+            SPDLOG_ERROR("readv() returned len={} flen={}", rlen, flen);
             errno = EBADMSG;
             return -1;
         }
@@ -208,6 +218,7 @@ int readn_t(int fd, char *buf, size_t count, time_t timeout)
     FD_ZERO(&fdset);
     FD_SET(fd, &fdset);
     if (select(fd + 1, &fdset, NULL, NULL, &tv) <= 0) {
+        SPDLOG_DEBUG("select() Timeout");
         return -1;
     }
 
@@ -226,34 +237,35 @@ static void *serialToTap(void *ptr)
     int tapFd = args->tapFileDescriptor;
     int serialFd = args->serialFd;
 
-    char inBuffer[FRAME_LENGTH];
+    // Create TAP buffer
+    std::array<char, FRAME_LENGTH> inBuffer;
 
     while (io_is_enabled()) {
         // Read bytes from serial
         // Incoming byte count
         ssize_t serialResult =
-            frame_read(serialFd, &inBuffer[0], sizeof(inBuffer));
+            frame_read(serialFd, inBuffer.data(), inBuffer.size());
         if (serialResult <= 0) {
-            perror("Serial read error!");
+            SPDLOG_ERROR("Serial read error {}({})", strerror(errno), errno);
             wait1Sec();
             continue;
         }
 
         // Write the packet to the virtual interface
-        ssize_t count = write(tapFd, inBuffer, serialResult);
+        ssize_t count = write(tapFd, inBuffer.data(), serialResult);
         if (count != serialResult) {
-            perror("TAP write error!");
+            SPDLOG_ERROR("TAP write error {}({})", strerror(errno), errno);
             wait1Sec();
             continue;
         }
 
 #ifndef NODEBUG
-        fprintf(stderr, "%s\n", inBuffer); // debug TRACE only! CK
+        SPDLOG_TRACE("serialToTap {}:{:n}", count, spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count ));
         sleep(1);
 #endif
     }
 
-    fprintf(stderr, "serialToTap thread stopped\n");
+    SPDLOG_INFO("serialToTap thread stopped");
     return NULL;
 }
 
@@ -265,32 +277,32 @@ static void *tapToSerial(void *ptr)
     int serialFd = args->serialFd;
 
     // Create TAP buffer
-    char inBuffer[FRAME_LENGTH];
+    std::array<char, FRAME_LENGTH> inBuffer;
 
     while (io_is_enabled()) {
         // Incoming byte count
-        ssize_t count = read(tapFd, inBuffer, sizeof(inBuffer));
+        ssize_t count = read(tapFd, inBuffer.data(), inBuffer.size());
         if (count <= 0) {
-            perror("Could not read from TAP!");
+            SPDLOG_ERROR("TAP read error {}({})", strerror(errno), errno);
             wait1Sec();
             continue;
         }
 
         // Write to serial port
-        ssize_t serialResult = frame_write(serialFd, inBuffer, count);
+        ssize_t serialResult = frame_write(serialFd, inBuffer.data(), count);
         if (serialResult < 0) {
-            perror("Could not write to serial!");
+            SPDLOG_ERROR("Serial write error {}({})", strerror(errno), errno);
             wait1Sec();
             continue;
         }
 
 #ifndef NODEBUG
-        fprintf(stderr, "%s\n", inBuffer); // debug TRACE only! CK
+        SPDLOG_TRACE("tapToSerial {}:{:n}", count, spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
         sleep(1);
 #endif
     }
 
-    fprintf(stderr, "tapToSerial thread stopped\n");
+    SPDLOG_INFO("tapToSerial thread stopped");
     return NULL;
 }
 
@@ -300,7 +312,7 @@ int main(int argc, char *argv[])
 
     // Grab parameters
     int param;
-    while ((param = getopt(argc, argv, "i:d:p")) > 0) {
+    while ((param = getopt(argc, argv, "i:d:pv")) > 0) {
         switch (param) {
         case 'i':
             strncpy(adapterName, optarg, IF_NAMESIZE - 1);
@@ -310,9 +322,12 @@ int main(int argc, char *argv[])
             break;
         case 'p':
             mode = VTUN_PIPE;
+            // fallthrough
+        case 'v':
+            spdlog::set_level(spdlog::level::trace); // Set global log level
             break;
         default:
-            fprintf(stderr, "Usage: %s -i tun0 -d /dev/spidip2.0 [-p]\n",
+            fprintf(stderr, "Usage: %s -i tun0 -d /dev/spidip2.0 [-p] [-v]\n",
                     *argv);
             return EXIT_FAILURE;
         }
@@ -392,7 +407,7 @@ int main(int argc, char *argv[])
     threadParams.tapFileDescriptor = tapFd;
     threadParams.serialFd = serialFd;
 
-    fprintf(stderr, "Starting threads\n");
+    SPDLOG_INFO("Starting threads");
     do {
         int err = pthread_create(&tap2serial, NULL, tapToSerial,
                                  (void *)&threadParams);
@@ -410,7 +425,7 @@ int main(int argc, char *argv[])
         }
 
         if (mode == VTUN_PIPE) {
-            sleep(2);
+            sleep(1);
 
             char msg[] = "Hallo\n";
             pipe_write(1, msg, sizeof(msg)); // stdout
@@ -423,11 +438,11 @@ int main(int argc, char *argv[])
         }
 
         err = pthread_join(tap2serial, NULL);
-        fprintf(stderr, "Thread tap2serial joined %d\n", err);
+        SPDLOG_INFO("Thread tapToSerial joined {}", err);
         close(tapFd);
 
         err = pthread_join(serial2tap, NULL);
-        fprintf(stderr, "Thread serial2tap joined %d\n", err);
+        SPDLOG_INFO("Thread serialToTap joined {}", err);
         close(serialFd);
         return EXIT_SUCCESS;
     } while (false);
