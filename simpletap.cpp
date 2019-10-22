@@ -1,10 +1,10 @@
 #include "tun-driver.h"
 
 #ifndef NODEBUG
-#    define SPDLOG_LEVEL_TRACE 0
-#    define SPDLOG_LEVEL_DEBUG 1
-#    define SPDLOG_LEVEL_INFO 2 // default log level
-#    define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+// #define SPDLOG_LEVEL_TRACE 0
+// #define SPDLOG_LEVEL_DEBUG 1
+// #define SPDLOG_LEVEL_INFO 2 // default log level
+#    define SPDLOG_ACTIVE_LEVEL 0   // NOLINT
 #endif
 
 #include "spdlog/spdlog.h"
@@ -29,13 +29,13 @@
 #include <unistd.h>
 using namespace std::literals;
 
-const uint16_t FRAME_LEN_MASK(0x7fff);
-const uint16_t FRAME_LENGTH(0x8000);
+constexpr uint16_t FRAME_LEN_MASK(0x7fff);
+constexpr uint16_t FRAME_LENGTH(0x8000);
 
 #ifndef NODEBUG
-#    define wait100ms() std::this_thread::sleep_for(100ms);
+#    define wait100ms() std::this_thread::sleep_for(100ms)  // NOLINT
 #else
-#    define wait100ms() (void)0
+#    define wait100ms() (void)0 // NOLINT
 #endif
 
 struct CommDevices
