@@ -27,7 +27,7 @@ PROJECT_NAME:=$(shell basename $${PWD})
 #XXX CXX:=$(shell which clang++)
 ## CC:=/opt/local/bin/clang
 ## CXX:=/opt/local/bin/clang++
-BUILD_TYPE:=Coverage
+#NO! BUILD_TYPE:=Coverage
 BUILD_TYPE?=Debug
 BUILD_TYPE?=Release
 # GENERATOR:=Xcode
@@ -51,7 +51,7 @@ setup: $(BUILD_DIR) .clang-tidy compile_commands.json
 
 .configure-$(BUILD_TYPE): CMakeLists.txt
 	cd $(BUILD_DIR) && cmake -G $(GENERATOR) -Wdeprecated -Wdev \
-      -DUSE_LCOV=on -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+      -DUSE_LCOV=off -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
       -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX} $(CURDIR)
 	touch $@
 

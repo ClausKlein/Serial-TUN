@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14.1)
+cmake_minimum_required(VERSION 3.13.1)
 project(serial_tun LANGUAGES C CXX)
 
 #---------------------------------------------------------------------------------------
@@ -44,14 +44,28 @@ if(NOT SERIAL_TUN_MASTER_PROJECT)
 endif()
 
 include(FetchContent)
+if(CMAKE_VERSION VERSION_LESS "3.14")
+    function(fetchcontent_makeavailable name)
+        fetchcontent_getproperties(${name})
+        if(NOT ${name}_POPULATED)
+            fetchcontent_populate(${name})
+            add_subdirectory(${${name}_SOURCE_DIR} ${${name}_BINARY_DIR})
+        endif()
+    endfunction()
+endif()
 
 if(SERIAL_TUN_MASTER_PROJECT)
-    fetchcontent_declare(
-        spdlog
-        GIT_REPOSITORY https://github.com/gabime/spdlog.git
-        GIT_TAG        v1.4.2
-    )
-    fetchcontent_makeavailable(spdlog)
+    find_package(spdlog 1.4.2)
+    if(NOT spdlog_DIR)
+        fetchcontent_declare(
+            spdlog
+            GIT_REPOSITORY https://github.com/gabime/spdlog.git
+            GIT_TAG        v1.4.2
+        )
+        fetchcontent_makeavailable(spdlog)
+    endif()
+else()
+    find_package(spdlog 1.4.2 REQUIRED)
 endif()
 
 add_executable(simpletap simpletap.cpp tun-driver.cpp tun-driver.h)
@@ -63,19 +77,15 @@ option(SERIAL_TUN_BUILD_TESTS "Build tests" ${SERIAL_TUN_MASTER_PROJECT})
 if(SERIAL_TUN_BUILD_TESTS)
     enable_testing()
 
-#NO! find_package(doctest 2.3.5 REQUIRED)
-    fetchcontent_declare(
-        doctest
-        GIT_REPOSITORY https://github.com/onqtam/doctest.git
-        GIT_TAG        2.3.5
-    )
-    fetchcontent_makeavailable(doctest)
-#OR
-#   fetchcontent_getproperties(doctest)
-#   if(NOT doctest_POPULATED)
-#       fetchcontent_populate(doctest)
-#       add_subdirectory(${doctest_SOURCE_DIR} ${doctest_BINARY_DIR})
-#   endif()
+    find_package(doctest 2.3.5)
+    if(NOT doctest_DIR)
+        fetchcontent_declare(
+            doctest
+            GIT_REPOSITORY https://github.com/onqtam/doctest.git
+            GIT_TAG        2.3.5
+        )
+        fetchcontent_makeavailable(doctest)
+    endif()
 
     add_test(NAME simpletap0 COMMAND simpletap -d /dev/XXX -i tap0 -p)
     add_test(NAME simpletapPipe COMMAND simpletap -d /dev/XXX -p)
