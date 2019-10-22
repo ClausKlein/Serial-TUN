@@ -1,16 +1,22 @@
 #include "tun-driver.h"
 
-#define SPDLOG_LEVEL_TRACE 0
-#define SPDLOG_LEVEL_DEBUG 1
-#define SPDLOG_LEVEL_INFO 2 // default log level
-#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+#ifndef NODEBUG
+#    define SPDLOG_LEVEL_TRACE 0
+#    define SPDLOG_LEVEL_DEBUG 1
+#    define SPDLOG_LEVEL_INFO 2 // default log level
+#    define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+#endif
+
 #include "spdlog/spdlog.h"
+// NOTE: as second! CK
 #include "spdlog/fmt/bin_to_hex.h"
 
 #include <arpa/inet.h>
 #include <array>
+#include <chrono>
 #include <errno.h>
 #include <fcntl.h>
+#include <iterator>
 #include <limits.h>
 #include <pthread.h>
 #include <signal.h>
@@ -19,21 +25,24 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
+#include <thread>
 #include <unistd.h>
+using namespace std::literals;
 
 const uint16_t FRAME_LEN_MASK(0x7fff);
 const uint16_t FRAME_LENGTH(0x8000);
 
 #ifndef NODEBUG
-#    define wait1Sec() sleep(1)
+#    define wait100ms() std::this_thread::sleep_for(100ms);
 #else
-#    define wait1Sec() (void)0
+#    define wait100ms() (void)0
 #endif
 
 struct CommDevices
 {
     int tapFileDescriptor;
     int serialFd;
+    enum tun_mode_t mode;
 };
 
 char adapterName[IF_NAMESIZE] = {};
@@ -247,7 +256,11 @@ static void *serialToTap(void *ptr)
             frame_read(serialFd, inBuffer.data(), inBuffer.size());
         if (serialResult <= 0) {
             SPDLOG_ERROR("Serial read error {}({})", strerror(errno), errno);
-            wait1Sec();
+            wait100ms();
+            if (args->mode == VTUN_PIPE) {
+                char msg[] = "Hallo again";
+                (void)frame_write(tapFd, msg, sizeof(msg));
+            }
             continue;
         }
 
@@ -255,14 +268,14 @@ static void *serialToTap(void *ptr)
         ssize_t count = write(tapFd, inBuffer.data(), serialResult);
         if (count != serialResult) {
             SPDLOG_ERROR("TAP write error {}({})", strerror(errno), errno);
-            wait1Sec();
+            wait100ms();
             continue;
         }
 
-#ifndef NODEBUG
-        SPDLOG_TRACE("serialToTap {}:{:n}", count, spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count ));
-        sleep(1);
-#endif
+        SPDLOG_TRACE(
+            "serialToTap {}:{:n}", count,
+            spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
+        wait100ms();
     }
 
     SPDLOG_INFO("serialToTap thread stopped");
@@ -284,22 +297,27 @@ static void *tapToSerial(void *ptr)
         ssize_t count = read(tapFd, inBuffer.data(), inBuffer.size());
         if (count <= 0) {
             SPDLOG_ERROR("TAP read error {}({})", strerror(errno), errno);
-            wait1Sec();
+            wait100ms();
             continue;
         }
 
         // Write to serial port
-        ssize_t serialResult = frame_write(serialFd, inBuffer.data(), count);
+        ssize_t serialResult;
+        if (args->mode == VTUN_PIPE) {
+            serialResult = pipe_write(serialFd, inBuffer.data(), count);
+        } else {
+            serialResult = frame_write(serialFd, inBuffer.data(), count);
+        }
         if (serialResult < 0) {
             SPDLOG_ERROR("Serial write error {}({})", strerror(errno), errno);
-            wait1Sec();
+            wait100ms();
             continue;
         }
 
-#ifndef NODEBUG
-        SPDLOG_TRACE("tapToSerial {}:{:n}", count, spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
-        sleep(1);
-#endif
+        SPDLOG_TRACE(
+            "tapToSerial {}:{:n}", count,
+            spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
+        wait100ms();
     }
 
     SPDLOG_INFO("tapToSerial thread stopped");
@@ -364,10 +382,10 @@ int main(int argc, char *argv[])
 
         fprintf(stderr, "Test mode, use VTUN_PIPE first end!\n");
         tapFd = fd[0];
-        char pingMsg[] = "Ping";
-        ssize_t len = frame_write(tapFd, pingMsg, sizeof(pingMsg));
+        char pingMsg[] = "\x05\0Ping";
+        ssize_t len = write_n(tapFd, pingMsg, sizeof(pingMsg));
         if (len <= 0) {
-            perror("frame_write Ping");
+            perror("write_n Ping");
         }
     }
 
@@ -406,6 +424,7 @@ int main(int argc, char *argv[])
     struct CommDevices threadParams;
     threadParams.tapFileDescriptor = tapFd;
     threadParams.serialFd = serialFd;
+    threadParams.mode = mode;
 
     SPDLOG_INFO("Starting threads");
     do {
@@ -425,12 +444,12 @@ int main(int argc, char *argv[])
         }
 
         if (mode == VTUN_PIPE) {
-            sleep(1);
-
             char msg[] = "Hallo\n";
             pipe_write(1, msg, sizeof(msg)); // stdout
             if (readn_t(0, msg, sizeof(msg), 3) < 0) {
                 fprintf(stderr, "Timeout while read from stdin\n");
+            } else {
+                sleep(1);
             }
             signal_handler(3);
 

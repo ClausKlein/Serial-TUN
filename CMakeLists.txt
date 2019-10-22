@@ -108,8 +108,8 @@ if(SERIAL_TUN_BUILD_TESTS)
         include(CodeCoverage)
 
         set(COVERAGE_EXCLUDES
-            '${FETCHCONTENT_BASE_DIR}/*' '/usr/local/*'
-            '/Applications/Xcode.app/*' '/opt/local/*'
+            '${FETCHCONTENT_BASE_DIR}/*' '/usr/*'
+            '/Applications/Xcode.app/*' '/opt/*'
         )
         setup_target_for_coverage(
             NAME lcov   # NAME for custom target.
