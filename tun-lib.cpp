@@ -1,8 +1,8 @@
 #include "tun-driver.h"
 
 #include <arpa/inet.h>
-#include <sys/uio.h>
 #include <errno.h>
+#include <sys/uio.h>
 
 /* Read exactly len bytes (Signal safe) */
 int read_n(int fd, char *buf, size_t len)

@@ -81,7 +81,7 @@ int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
                  i);
         /* Open device */
         if ((fd = open(tunname, O_RDWR)) > 0) {
-            strcpy(dev, tunname + 5);   // NOLINT
+            strcpy(dev, tunname + 5); // NOLINT
             return fd;
         }
 

@@ -2,21 +2,17 @@
 
 #include <array>
 #include <chrono>
-#include <iterator>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
 #include <pthread.h>
 #include <signal.h>
 #include <string.h>
 #include <thread>
 using namespace std::literals;
 
-#ifndef NODEBUG
-#    define wait100ms() std::this_thread::sleep_for(100ms)  // NOLINT
-#else
-#    define wait100ms() (void)0 // NOLINT
-#endif
+#define wait100ms() std::this_thread::sleep_for(100ms) // NOLINT
 
 struct CommDevices
 {
@@ -60,19 +56,23 @@ static void *serialToTap(void *ptr)
         ssize_t serialResult =
             frame_read(serialFd, inBuffer.data(), inBuffer.size());
         if (serialResult <= 0) {
-            SPDLOG_ERROR("Serial read error {}({})", strerror(errno), errno);
+            SPDLOG_ERROR("Serial read error({}) {}", errno, strerror(errno));
             wait100ms();
+
+#ifndef NDEBUG
             if (args->mode == VTUN_PIPE) {
                 char msg[] = "Hallo again";
                 (void)frame_write(tapFd, msg, sizeof(msg));
             }
+#endif
+
             continue;
         }
 
         // Write the packet to the virtual interface
         ssize_t count = write(tapFd, inBuffer.data(), serialResult);
         if (count != serialResult) {
-            SPDLOG_ERROR("TAP write error {}({})", strerror(errno), errno);
+            SPDLOG_ERROR("TAP write error({}) {}", errno, strerror(errno));
             wait100ms();
             continue;
         }
@@ -80,7 +80,6 @@ static void *serialToTap(void *ptr)
         SPDLOG_TRACE(
             "serialToTap {}:{:n}", count,
             spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
-        wait100ms();
     }
 
     SPDLOG_INFO("serialToTap thread stopped");
@@ -101,20 +100,25 @@ static void *tapToSerial(void *ptr)
         // Incoming byte count
         ssize_t count = read(tapFd, inBuffer.data(), inBuffer.size());
         if (count <= 0) {
-            SPDLOG_ERROR("TAP read error {}({})", strerror(errno), errno);
+            SPDLOG_ERROR("TAP read error({}) {}", errno, strerror(errno));
             wait100ms();
             continue;
         }
 
         // Write to serial port
         ssize_t serialResult;
+
+#ifndef NDEBUG
         if (args->mode == VTUN_PIPE) {
             serialResult = pipe_write(serialFd, inBuffer.data(), count);
-        } else {
+        } else
+#endif
+
+        {
             serialResult = frame_write(serialFd, inBuffer.data(), count);
         }
         if (serialResult < 0) {
-            SPDLOG_ERROR("Serial write error {}({})", strerror(errno), errno);
+            SPDLOG_ERROR("Serial write error({}) {}", errno, strerror(errno));
             wait100ms();
             continue;
         }
@@ -122,7 +126,6 @@ static void *tapToSerial(void *ptr)
         SPDLOG_TRACE(
             "tapToSerial {}:{:n}", count,
             spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
-        wait100ms();
     }
 
     SPDLOG_INFO("tapToSerial thread stopped");
@@ -218,7 +221,8 @@ int main(int argc, char *argv[])
     sa.sa_handler = signal_handler;
     sigaction(SIGHUP, &sa, NULL);  // terminal line hangup (1)
     sigaction(SIGQUIT, &sa, NULL); // quit program (3)
-    sigaction(SIGPIPE, &sa, NULL); // Broken pipe: write to pipe with no readers (13)
+    sigaction(SIGPIPE, &sa,
+              NULL); // Broken pipe: write to pipe with no readers (13)
     // NO!   sigaction(SIGALRM, &sa, NULL); // XXX timer expired (14)
     // FIXME sigaction(SIGTERM, &sa, NULL); // software termination signal (15)
 
@@ -249,7 +253,8 @@ int main(int argc, char *argv[])
         }
 
         if (mode == VTUN_PIPE) {
-            alarm(4); // NOTE: XXX watchdog timer: send unhandled SIGALRM after 4 sec! CK
+            alarm(4); // NOTE: XXX watchdog timer: send unhandled SIGALRM after
+                      // 4 sec! CK
             char msg[] = "Hallo\n";
             pipe_write(1, msg, sizeof(msg)); // stdout
             if (readn_t(0, msg, sizeof(msg), 3) < 0) {

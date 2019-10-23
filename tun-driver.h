@@ -1,10 +1,10 @@
 #pragma once
 
-#ifndef NODEBUG
+#ifndef NDEBUG
 // #define SPDLOG_LEVEL_TRACE 0
 // #define SPDLOG_LEVEL_DEBUG 1
 // #define SPDLOG_LEVEL_INFO 2 // default log level
-#    define SPDLOG_ACTIVE_LEVEL 0   // NOLINT
+#    define SPDLOG_ACTIVE_LEVEL 0 // NOLINT
 #endif
 
 #include "spdlog/spdlog.h"
