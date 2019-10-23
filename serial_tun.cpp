@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 struct CommDevices
 {
@@ -29,7 +28,7 @@ static void *tunToSerial(void *ptr);
 static void *serialToTun(void *ptr)
 {
     // Grab thread parameters
-    struct CommDevices *args = ptr;
+    struct CommDevices *args = (struct CommDevices *)ptr;
 
     int tunFd = args->tunFileDescriptor;
     struct sp_port *serialPort = args->serialPort;
@@ -52,7 +51,7 @@ static void *serialToTun(void *ptr)
     sp_new_event_set(&eventSet);
     sp_add_port_events(eventSet, serialPort, SP_EVENT_RX_READY);
 
-    while (1) {
+    while (true) {
         // Wait for the event (RX Ready)
         sp_wait(eventSet, 0);
         count = sp_input_waiting(serialPort); // Bytes ready for reading
@@ -94,7 +93,7 @@ static void *serialToTun(void *ptr)
 static void *tunToSerial(void *ptr)
 {
     // Grab thread parameters
-    struct CommDevices *args = ptr;
+    struct CommDevices *args = (struct CommDevices *)ptr;
 
     int tunFd = args->tunFileDescriptor;
     struct sp_port *serialPort = args->serialPort;
@@ -112,7 +111,7 @@ static void *tunToSerial(void *ptr)
     // Serial error messages
     enum sp_return serialResult;
 
-    while (1) {
+    while (true) {
         count = read(tunFd, inBuffer, sizeof(inBuffer));
         if (count < 0) {
             fprintf(stderr, "Could not read from interface\n");

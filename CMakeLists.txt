@@ -21,7 +21,7 @@ find_library(SerialPort_lib serialport)
 find_file(SerialPort_header libserialport.h)
 
 if(SerialPort_lib)
-    set(SOURCE_FILES main.c tun-driver.cpp tun-driver.h ${SerialPort_header} slip.cpp slip.h)
+    set(SOURCE_FILES serial_tun.cpp tun-driver.cpp tun-driver.h ${SerialPort_header} slip.cpp slip.h)
     add_executable(serial_tun ${SOURCE_FILES})
     target_link_libraries(serial_tun ${SerialPort_lib} ${CMAKE_THREAD_LIBS_INIT})
 endif()
@@ -68,7 +68,7 @@ else()
     find_package(spdlog 1.4.2 REQUIRED)
 endif()
 
-add_executable(simpletap simpletap.cpp tun-driver.cpp tun-driver.h)
+add_executable(simpletap simpletap.cpp tun-lib.cpp tun-driver.cpp tun-driver.h)
 target_link_libraries(simpletap PRIVATE spdlog::spdlog ${CMAKE_THREAD_LIBS_INIT})
 set_target_properties(simpletap PROPERTIES CXX_STANDARD 14)
 
