@@ -8,7 +8,10 @@ MAKEFLAGS+= --no-builtin-rules
 
 .PHONY: setup all test lcov install check format clean distclean
 
+PROJECT_NAME:=$(shell basename $${PWD})
 
+##################################################
+# begin of config part
 # see https://www.kdab.com/clang-tidy-part-1-modernize-source-code-using-c11c14/
 # and https://github.com/llvm-mirror/clang-tools-extra/blob/master/clang-tidy/tool/run-clang-tidy.py
 #
@@ -16,24 +19,31 @@ MAKEFLAGS+= --no-builtin-rules
 ## checkAllHeader?='include/spdlog/[^f].*'
 checkAllHeader?='$(CURDIR)/.*'
 
-# NOTE: to many errors with boost::test
+# NOTE: there are many errors with boost::test, doctest, catch test framework! CK
 CHECKS:='-cppcoreguidelines-avoid-c-arrays,-modernize-avoid-c-arrays,-modernize-deprecated-headers,-modernize-use-trailing-return-type'
 CHECKS?='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoid-c-arrays'
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
 
-PROJECT_NAME:=$(shell basename $${PWD})
 #XXX CXX:=$(shell which clang++)
 ## CC:=/opt/local/bin/clang
 ## CXX:=/opt/local/bin/clang++
-#NO! BUILD_TYPE:=Coverage
+#NO!
+BUILD_TYPE:=Coverage
 BUILD_TYPE?=Debug
 BUILD_TYPE?=Release
 # GENERATOR:=Xcode
 GENERATOR?=Ninja
-BUILD_DIR:=../.build-$(PROJECT_NAME)-$(BUILD_TYPE)
 
+# end of config part
+##################################################
+BUILD_DIR:=../.build-$(PROJECT_NAME)-$(BUILD_TYPE)
+ifeq ($(BUILD_TYPE),Coverage)
+    USE_LOV=ON
+else
+    USE_LOV=OFF
+endif
 
 all: setup .configure-$(BUILD_TYPE)
 	cmake --build $(BUILD_DIR)
@@ -51,7 +61,7 @@ setup: $(BUILD_DIR) .clang-tidy compile_commands.json
 
 .configure-$(BUILD_TYPE): CMakeLists.txt
 	cd $(BUILD_DIR) && cmake -G $(GENERATOR) -Wdeprecated -Wdev \
-      -DUSE_LCOV=off -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+      -DUSE_LCOV=$(USE_LOV) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
       -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX} $(CURDIR)
 	touch $@
 
