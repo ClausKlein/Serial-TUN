@@ -30,14 +30,16 @@ find_package(Threads REQUIRED)
 find_library(SerialPort_lib serialport)
 find_file(SerialPort_header libserialport.h)
 
-if(SerialPort_lib)
-    set(SOURCE_FILES serial_tun.cpp tun-driver.cpp tun-driver.h ${SerialPort_header} slip.cpp slip.h)
-    add_executable(serial_tun ${SOURCE_FILES})
-    target_link_libraries(serial_tun ${SerialPort_lib} ${CMAKE_THREAD_LIBS_INIT})
-endif()
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Coverage")
+    if(SerialPort_lib)
+        set(SOURCE_FILES serial_tun.cpp tun-driver.cpp tun-driver.h ${SerialPort_header} slip.cpp slip.h)
+        add_executable(serial_tun ${SOURCE_FILES})
+        target_link_libraries(serial_tun ${SerialPort_lib} ${CMAKE_THREAD_LIBS_INIT})
+    endif()
 
-if(LINUX)
-    add_executable(simpletun simpletun.cpp)
+    if(LINUX)
+        add_executable(simpletun simpletun.cpp)
+    endif()
 endif()
 
 

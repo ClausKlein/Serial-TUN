@@ -3,12 +3,11 @@
 #include <array>
 #include <chrono>
 #include <climits>
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <iterator>
-#include <pthread.h>
-#include <signal.h>
-#include <string.h>
 #include <thread>
 using namespace std::literals;
 
@@ -191,10 +190,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Test mode, use VTUN_PIPE first end!\n");
         tapFd = fd[0];
         char pingMsg[] = "\x05\0Ping";
-        ssize_t len = write_n(tapFd, pingMsg, sizeof(pingMsg));
-        if (len <= 0) {
-            perror("write_n Ping");
-        }
+        (void) write_n(tapFd, pingMsg, sizeof(pingMsg));
     }
 
     int serialFd = open(serialDevice, O_RDWR | O_CLOEXEC);
@@ -209,10 +205,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Test mode, use VTUN_PIPE second end!\n");
         serialFd = fd[1];
         char pingMsg[] = "Pong";
-        ssize_t len = frame_write(serialFd, pingMsg, sizeof(pingMsg));
-        if (len <= 0) {
-            perror("frame_write Pong");
-        }
+        (void) frame_write(serialFd, pingMsg, sizeof(pingMsg));
     }
 
     // register signal handler

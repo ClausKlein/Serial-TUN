@@ -1,7 +1,7 @@
 #include "tun-driver.h"
 
 #include <arpa/inet.h>
-#include <errno.h>
+#include <cerrno>
 #include <sys/uio.h>
 
 /* Read exactly len bytes (Signal safe) */

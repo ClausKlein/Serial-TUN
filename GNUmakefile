@@ -20,7 +20,7 @@ PROJECT_NAME:=$(shell basename $${PWD})
 checkAllHeader?='$(CURDIR)/.*'
 
 # NOTE: there are many errors with boost::test, doctest, catch test framework! CK
-CHECKS:='-cppcoreguidelines-avoid-c-arrays,-modernize-avoid-c-arrays,-modernize-deprecated-headers,-modernize-use-trailing-return-type'
+CHECKS:='-cppcoreguidelines-avoid-c-arrays,-modernize-avoid-c-arrays'
 CHECKS?='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoid-c-arrays'
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
@@ -29,8 +29,7 @@ CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 #XXX CXX:=$(shell which clang++)
 ## CC:=/opt/local/bin/clang
 ## CXX:=/opt/local/bin/clang++
-#NO!
-BUILD_TYPE:=Coverage
+#NO! BUILD_TYPE:=Coverage
 BUILD_TYPE?=Debug
 BUILD_TYPE?=Release
 # GENERATOR:=Xcode

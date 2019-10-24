@@ -1,11 +1,11 @@
 #include "tun-driver.h"
 
-#include <errno.h>
+#include <cerrno>
+#include <climits>
+#include <cstdio>
+#include <cstring>
 #include <fcntl.h>
-#include <limits.h>
 #include <net/if.h>
-#include <stdio.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -26,7 +26,7 @@ int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
 
     // Open the tun device, if it doesn't exists return the error
     const char *cloneDevice = "/dev/net/tun";
-    if ((fileDescriptor = open(cloneDevice, O_RDWR)) < 0) {
+    if ((fileDescriptor = open(cloneDevice, O_RDWR | O_CLOEXEC)) < 0) {
         perror("open /dev/net/tun");
         return fileDescriptor;
     }
@@ -71,7 +71,7 @@ int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
 
     if (*dev) {
         snprintf(tunname, sizeof(tunname), "/dev/%s", dev);
-        return open(tunname, O_RDWR);
+        return open(tunname, O_RDWR | O_CLOEXEC);
     }
 
     int err = 0;
@@ -80,7 +80,7 @@ int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
         snprintf(tunname, sizeof(tunname), "/dev/%s%d", (mode ? "tun" : "tap"),
                  i);
         /* Open device */
-        if ((fd = open(tunname, O_RDWR)) > 0) {
+        if ((fd = open(tunname, O_RDWR | O_CLOEXEC)) > 0) {
             strcpy(dev, tunname + 5); // NOLINT
             return fd;
         }

@@ -3,7 +3,7 @@
 
 #include <doctest/doctest.h>
 
-#include <string.h>
+#include <cstring>
 
 const size_t BUF_MIN = 6;
 const size_t BUF_MAX = 8;
