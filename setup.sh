@@ -21,8 +21,10 @@ if [ "${USER}x" = "rootx" ] ; then
   echo 1 > /proc/sys/net/ipv4/ip_forward
 fi
 
-ip link show tap0
-ip addr show dev tap0
+if [ "${OSTYPE}X" = "linux-gnuX" ] ; then
+  ip link show tap0
+  ip addr show dev tap0
+fi
 
 #TODO Start in background
 ${1} -i tap0 -h || echo "OK"

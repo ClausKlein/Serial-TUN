@@ -1,11 +1,11 @@
 #include "slip.h"
 #include "tun-driver.h"
 
-#include <libserialport.h>
-#include <pthread.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <libserialport.h>
+#include <pthread.h>
 
 struct CommDevices
 {

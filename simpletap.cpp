@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Test mode, use VTUN_PIPE first end!\n");
         tapFd = fd[0];
         char pingMsg[] = "\x05\0Ping";
-        (void) write_n(tapFd, pingMsg, sizeof(pingMsg));
+        (void)write_n(tapFd, pingMsg, sizeof(pingMsg));
     }
 
     int serialFd = open(serialDevice, O_RDWR | O_CLOEXEC);
@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Test mode, use VTUN_PIPE second end!\n");
         serialFd = fd[1];
         char pingMsg[] = "Pong";
-        (void) frame_write(serialFd, pingMsg, sizeof(pingMsg));
+        (void)frame_write(serialFd, pingMsg, sizeof(pingMsg));
     }
 
     // register signal handler

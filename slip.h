@@ -45,6 +45,6 @@ enum slip_result slip_encode(const uint8_t *frame, size_t frameLength,
  * @param outputSize        Where to store output length
  * @return SLIP_OK for success, otherwise error code
  */
-enum slip_result slip_decode(const uint8_t *encodedFrame,
-                             size_t frameLength, uint8_t *output,
-                             size_t maxOutputSize, size_t *outputSize);
+enum slip_result slip_decode(const uint8_t *encodedFrame, size_t frameLength,
+                             uint8_t *output, size_t maxOutputSize,
+                             size_t *outputSize);
