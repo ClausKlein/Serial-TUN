@@ -34,7 +34,7 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "Coverage")
     if(SerialPort_lib)
         set(SOURCE_FILES serial_tun.cpp tun-driver.cpp tun-driver.h ${SerialPort_header} slip.cpp slip.h)
         add_executable(serial_tun ${SOURCE_FILES})
-        target_link_libraries(serial_tun ${SerialPort_lib} ${CMAKE_THREAD_LIBS_INIT})
+        target_link_libraries(serial_tun ${SerialPort_lib} Threads::Threads)
     endif()
 
     if(LINUX)
@@ -71,7 +71,7 @@ endif()
 
 
 if(SERIAL_TUN_MASTER_PROJECT)
-    find_package(spdlog 1.4.2)
+    find_package(spdlog 1.4.2 QUIET)
     if (NOT TARGET spdlog::spdlog_header_only)
         fetchcontent_declare(
             spdlog
@@ -87,7 +87,7 @@ endif()
 
 
 add_executable(simpletap simpletap.cpp tun-lib.cpp tun-driver.cpp tun-driver.h)
-target_link_libraries(simpletap PRIVATE spdlog::spdlog_header_only ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(simpletap PRIVATE spdlog::spdlog_header_only Threads::Threads)
 set_target_properties(simpletap PROPERTIES CXX_STANDARD 14)
 
 
@@ -96,7 +96,7 @@ option(SERIAL_TUN_BUILD_TESTS "Build tests" ${SERIAL_TUN_MASTER_PROJECT})
 if(SERIAL_TUN_BUILD_TESTS)
     enable_testing()
 
-    find_package(doctest 2.3.5)
+    find_package(doctest 2.3.5 QUIET)
     if (NOT TARGET doctest::doctest)
         fetchcontent_declare(
             doctest
