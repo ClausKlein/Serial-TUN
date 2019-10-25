@@ -7,26 +7,33 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <iterator>
 #include <thread>
 using namespace std::literals;
 
-#define wait100ms() std::this_thread::sleep_for(100ms) // NOLINT
-
-struct CommDevices
+class CommDevices
 {
-    int tapFileDescriptor;
-    int serialFd;
-    enum tun_mode_t mode;
+public:
+    CommDevices(int tapFd, int serialFd, enum tun_mode_t _mode)
+    : tapFileDescriptor(tapFd), serialFileDescriptor(serialFd), mode(_mode)
+    { }
+
+    void serialToTap();
+    void tapToSerial();
+
+    static void wait100ms() { std::this_thread::sleep_for(100ms); }
+
+private:
+    const int tapFileDescriptor;
+    const int serialFileDescriptor;
+    const enum tun_mode_t mode;
 };
 
 char adapterName[IF_NAMESIZE] = {};
 char serialDevice[_POSIX_PATH_MAX] = {};
 
 volatile bool __io_canceled = false;
-
-static void *serialToTap(void *ptr);
-static void *tapToSerial(void *ptr);
 
 static void signal_handler(int sig)
 {
@@ -35,16 +42,13 @@ static void signal_handler(int sig)
 }
 
 /**
- * Handles getting packets from the serial port and writing them to the TAP
- * interface
- * @param ptr       - Pointer to the CommDevices struct
+ * Handles getting packets from the serial port and writing them to the TAP interface
  */
-static void *serialToTap(void *ptr)
+void CommDevices::serialToTap()
 {
     // Grab thread parameters
-    struct CommDevices *args = (struct CommDevices *)ptr;
-    int tapFd = args->tapFileDescriptor;
-    int serialFd = args->serialFd;
+    const int tapFd = this->tapFileDescriptor;
+    const int serialFd = this->serialFileDescriptor;
 
     // Create TAP buffer
     std::array<char, ETHER_FRAME_LENGTH> inBuffer;
@@ -59,7 +63,7 @@ static void *serialToTap(void *ptr)
             wait100ms();
 
 #ifndef NDEBUG
-            if (args->mode == VTUN_PIPE) {
+            if (this->mode == VTUN_PIPE) {
                 char msg[] = "Hallo again";
                 (void)frame_write(tapFd, msg, sizeof(msg));
             }
@@ -82,15 +86,16 @@ static void *serialToTap(void *ptr)
     }
 
     SPDLOG_INFO("serialToTap thread stopped");
-    return NULL;
 }
 
-static void *tapToSerial(void *ptr)
+/**
+ * Handles getting packets from the TAP interface and writing them to the serial port
+ */
+void CommDevices::tapToSerial()
 {
     // Grab thread parameters
-    struct CommDevices *args = (struct CommDevices *)ptr;
-    int tapFd = args->tapFileDescriptor;
-    int serialFd = args->serialFd;
+    const int tapFd = this->tapFileDescriptor;
+    const int serialFd = this->serialFileDescriptor;
 
     // Create TAP buffer
     std::array<char, ETHER_FRAME_LENGTH> inBuffer;
@@ -108,7 +113,7 @@ static void *tapToSerial(void *ptr)
         ssize_t serialResult;
 
 #ifndef NDEBUG
-        if (args->mode == VTUN_PIPE) {
+        if (this->mode == VTUN_PIPE) {
             serialResult = pipe_write(serialFd, inBuffer.data(), count);
         } else
 #endif
@@ -128,7 +133,6 @@ static void *tapToSerial(void *ptr)
     }
 
     SPDLOG_INFO("tapToSerial thread stopped");
-    return NULL;
 }
 
 int main(int argc, char *argv[])
@@ -219,31 +223,13 @@ int main(int argc, char *argv[])
     // NO!   sigaction(SIGALRM, &sa, NULL); // XXX timer expired (14)
     // FIXME sigaction(SIGTERM, &sa, NULL); // software termination signal (15)
 
-    // Create threads
-    pthread_t serial2tap;
-    pthread_t tap2serial;
-
-    struct CommDevices threadParams;
-    threadParams.tapFileDescriptor = tapFd;
-    threadParams.serialFd = serialFd;
-    threadParams.mode = mode;
-
     SPDLOG_INFO("Starting threads");
-    do {
-        int err = pthread_create(&tap2serial, NULL, tapToSerial,
-                                 (void *)&threadParams);
-        if (err != 0) {
-            fprintf(stderr, "Can't create tapToSerial thread. %s(%d)",
-                    strerror(err), err);
-            break;
-        }
-        err = pthread_create(&serial2tap, NULL, serialToTap,
-                             (void *)&threadParams);
-        if (err != 0) {
-            fprintf(stderr, "Can't create serialToTap thread. %s(%d)",
-                    strerror(err), err);
-            break;
-        }
+    try
+    {
+        // Create threads
+        CommDevices threadParams(tapFd, serialFd, mode);
+        std::thread tap2serial(std::bind(&CommDevices::tapToSerial, threadParams));
+        std::thread serial2tap(std::bind(&CommDevices::serialToTap, threadParams));
 
         if (mode == VTUN_PIPE) {
             alarm(4); // NOTE: XXX watchdog timer: send unhandled SIGALRM after
@@ -251,7 +237,7 @@ int main(int argc, char *argv[])
             char msg[] = "Hallo\n";
             pipe_write(1, msg, sizeof(msg)); // stdout
             if (readn_t(0, msg, sizeof(msg), 3) < 0) {
-                fprintf(stderr, "Timeout while read from stdin\n");
+                SPDLOG_INFO("Timeout while read from stdin");
             } else {
                 sleep(1);
             }
@@ -260,15 +246,20 @@ int main(int argc, char *argv[])
             shutdown(tapFd, SHUT_WR);
         }
 
-        err = pthread_join(tap2serial, NULL);
-        SPDLOG_INFO("Thread tapToSerial joined {}", err);
+        tap2serial.join();
+        SPDLOG_INFO("Thread tapToSerial joined ");
         close(tapFd);
 
-        err = pthread_join(serial2tap, NULL);
-        SPDLOG_INFO("Thread serialToTap joined {}", err);
+        serial2tap.join();
+        SPDLOG_INFO("Thread serialToTap joined ");
         close(serialFd);
+
         return EXIT_SUCCESS;
-    } while (false);
+    }
+    catch(std::exception & e)
+    {
+        SPDLOG_ERROR("Exception {}", e.what());
+    }
 
     close(tapFd);
     close(serialFd);
