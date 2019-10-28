@@ -90,6 +90,16 @@ add_executable(simpletap simpletap.cpp tun-lib.cpp tun-driver.cpp tun-driver.h)
 target_link_libraries(simpletap PRIVATE spdlog::spdlog_header_only Threads::Threads)
 set_target_properties(simpletap PROPERTIES CXX_STANDARD 14)
 
+# install options
+option(SERIAL_TUN_INSTALL "Generate the install target." ${SERIAL_TUN_MASTER_PROJECT})
+#---------------------------------------------------------------------------------------
+# Install
+#---------------------------------------------------------------------------------------
+if(SERIAL_TUN_INSTALL)
+    include(GNUInstallDirs)
+    install(TARGETS simpletap DESTINATION "${CMAKE_INSTALL_SBINDIR}")
+    install(PROGRAMS cbp2net_blk.sh cbp2net_red.sh DESTINATION "${CMAKE_INSTALL_SBINDIR}")
+endif()
 
 # testing options
 option(SERIAL_TUN_BUILD_TESTS "Build tests" ${SERIAL_TUN_MASTER_PROJECT})

@@ -24,7 +24,7 @@ ip addr add ${IPV4_BLK} dev ${TAP_NAME}
 ip link set dev ${TAP_NAME} up
 
 # add default gateway for routing
-#FIXME ip route add default via ${IPV4_RED} dev ${TAP_NAME}
+ip route add default via ${IPV4_RED} dev ${TAP_NAME}
 ip route add ${IPV4_TESTNET} dev ${TAP_NAME}
 
 ip link show ${TAP_NAME}
