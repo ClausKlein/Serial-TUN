@@ -9,14 +9,54 @@
 #include <cstring>
 #include <functional>
 #include <iterator>
+#include <memory>
 #include <thread>
 using namespace std::literals;
+
+class ExtensionPoint
+{
+public:
+    enum Channel {IN_BOUND = 0, OUT_BOUND = 1};
+
+    ExtensionPoint() {}
+    virtual ~ExtensionPoint() {}
+
+    virtual ssize_t read(Channel fd, void *buf, size_t count) = 0;
+    virtual ssize_t write (Channel fd, const void *buf, size_t count) = 0;
+};
+
+class Pipe: public ExtensionPoint
+{
+public:
+    Pipe() {
+        if (pipe_open(fd) < 0) {
+        // TODO throw ...
+        }
+    }
+
+    ~Pipe() {
+        close(fd[IN_BOUND]);
+        close(fd[OUT_BOUND]);
+    }
+
+    ssize_t read(Channel id, void *buf, size_t count) override {
+        return ::read(fd[id], buf, count);
+    }
+    ssize_t write(Channel id, const void *buf, size_t count) override {
+        return ::write(fd[id], buf, count);
+    }
+
+private:
+    int fd[2] {-1, -1};
+};
 
 class CommDevices
 {
 public:
-    CommDevices(int tapFd, int serialFd, enum tun_mode_t _mode)
-    : tapFileDescriptor(tapFd), serialFileDescriptor(serialFd), mode(_mode)
+    typedef std::shared_ptr<ExtensionPoint> extensionPtr_t;
+
+    CommDevices(int tapFd, int serialFd, enum tun_mode_t _mode, extensionPtr_t optional)
+    : tapFileDescriptor(tapFd), serialFileDescriptor(serialFd), mode(_mode), extensionPoint(optional)
     { }
 
     void serialToTap();
@@ -28,6 +68,7 @@ private:
     const int tapFileDescriptor;
     const int serialFileDescriptor;
     const enum tun_mode_t mode;
+    extensionPtr_t extensionPoint;
 };
 
 char adapterName[IF_NAMESIZE] = {};
@@ -227,7 +268,11 @@ int main(int argc, char *argv[])
     try
     {
         // Create threads
-        CommDevices threadParams(tapFd, serialFd, mode);
+        //TODO if (black_node)
+            // CommDevices threadParams(tapFd, serialFd, mode, std::shared_ptr<Pipe>());
+        // TODO else
+        CommDevices threadParams(tapFd, serialFd, mode, std::make_shared<Pipe>());
+
         std::thread tap2serial(std::bind(&CommDevices::tapToSerial, threadParams));
         std::thread serial2tap(std::bind(&CommDevices::serialToTap, threadParams));
 
