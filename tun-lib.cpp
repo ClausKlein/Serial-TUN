@@ -67,7 +67,7 @@ ssize_t frame_write(int fd, char *buf, size_t len)
 
     /* Write frame */
     iv[0].iov_len = sizeof(uint16_t);
-    iv[0].iov_base = (char *)&hdr;
+    iv[0].iov_base = &hdr;
     iv[1].iov_len = len;
     iv[1].iov_base = buf;
 
@@ -107,7 +107,7 @@ ssize_t frame_read(int fd, char *buf, size_t len)
 
     /* Read frame */
     iv[0].iov_len = sizeof(uint16_t);
-    iv[0].iov_base = (char *)&hdr;
+    iv[0].iov_base = &hdr;
     iv[1].iov_len = len;
     iv[1].iov_base = buf;
 
@@ -141,8 +141,7 @@ ssize_t frame_read(int fd, char *buf, size_t len)
 int readn_t(int fd, char *buf, size_t count, time_t timeout)
 {
     fd_set fdset;
-    struct timeval tv
-    {};
+    struct timeval tv = {};
 
     tv.tv_usec = 0;
     tv.tv_sec = timeout;

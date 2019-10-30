@@ -1,4 +1,4 @@
-#include "tun-driver.h"
+#include "ExtensionPoint.h"
 
 #include <array>
 #include <chrono>
@@ -13,53 +13,6 @@
 #include <thread>
 using namespace std::literals;
 
-class ExtensionPoint
-{
-public:
-    enum Channel
-    {
-        IN_BOUND = 0,
-        OUT_BOUND = 1
-    };
-
-    ExtensionPoint() {}
-    virtual ~ExtensionPoint() {}
-
-    virtual ssize_t read(Channel fd, void *buf, size_t count) noexcept = 0;
-    virtual ssize_t write(Channel fd, const void *buf,
-                          size_t count) noexcept = 0;
-};
-
-class Pipe : public ExtensionPoint
-{
-public:
-    Pipe()
-    {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-        if (pipe_open(fd) < 0) {
-            // TODO: Trace, log ...
-        }
-    }
-
-    ~Pipe() override
-    {
-        close(fd[IN_BOUND]);
-        close(fd[OUT_BOUND]);
-    }
-
-    ssize_t read(Channel id, void *buf, size_t count) noexcept override
-    {
-        return ::read(fd[id], buf, count);
-    }
-    ssize_t write(Channel id, const void *buf, size_t count) noexcept override
-    {
-        return ::write(fd[id], buf, count);
-    }
-
-private:
-    int fd[2]{-1, -1};
-};
-
 class CommDevices
 {
 public:
@@ -68,12 +21,13 @@ public:
     CommDevices(int tapFd, int serialFd, enum tun_mode_t _mode,
                 extensionPtr_t optional)
         : tapFileDescriptor(tapFd), serialFileDescriptor(serialFd), mode(_mode),
-          extensionPoint(optional)
+          extensionPoint(std::move(optional))
     {}
 
     void serialToTap();
     void tapToSerial();
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
     static void wait100ms() { std::this_thread::sleep_for(100ms); }
 
 private:
@@ -105,7 +59,7 @@ void CommDevices::serialToTap()
     const int serialFd = this->serialFileDescriptor;
 
     // Create TAP buffer
-    std::array<char, ETHER_FRAME_LENGTH> inBuffer;
+    std::array<char, ETHER_FRAME_LENGTH> inBuffer{};
 
     while (io_is_enabled()) {
         // Read bytes from serial
@@ -154,7 +108,7 @@ void CommDevices::tapToSerial()
     const int serialFd = this->serialFileDescriptor;
 
     // Create TAP buffer
-    std::array<char, ETHER_FRAME_LENGTH> inBuffer;
+    std::array<char, ETHER_FRAME_LENGTH> inBuffer{};
 
     while (io_is_enabled()) {
         // Incoming byte count
@@ -240,8 +194,7 @@ int main(int argc, char *argv[])
     if (mode == VTUN_PIPE) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         if (pipe_open(fd) < 0) {
-            fprintf(stderr, "Can't create pipe. %s(%d)", strerror(errno),
-                    errno);
+            SPDLOG_ERROR("pipe_open() error({}) {}", errno, strerror(errno));
             return EXIT_FAILURE;
         }
     }
@@ -249,13 +202,12 @@ int main(int argc, char *argv[])
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     int tapFd = tun_open_common(adapterName, mode);
     if (tapFd < 0) {
-        perror(adapterName);
-        fprintf(stderr, "Could not open tuntap interface!\n");
+        SPDLOG_ERROR("tun_open_common() error({}) {}", errno, strerror(errno));
         if (mode != VTUN_PIPE) {
             return EXIT_FAILURE;
         }
 
-        fprintf(stderr, "Test mode, use VTUN_PIPE first end!\n");
+        SPDLOG_INFO("Test mode, use VTUN_PIPE first end!");
         tapFd = fd[0];
         char pingMsg[] = "\x05\0Ping";
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
@@ -264,14 +216,13 @@ int main(int argc, char *argv[])
 
     int serialFd = open(serialDevice, O_RDWR | O_CLOEXEC);
     if (serialFd < 0) {
-        perror(serialDevice);
-        fprintf(stderr, "Could not open serial port!\n");
+        SPDLOG_ERROR("open() error({}) {}", errno, strerror(errno));
         if (mode != VTUN_PIPE) {
             close(tapFd);
             return EXIT_FAILURE;
         }
 
-        fprintf(stderr, "Test mode, use VTUN_PIPE second end!\n");
+        SPDLOG_INFO("Test mode, use VTUN_PIPE second end!");
         serialFd = fd[1];
         char pingMsg[] = "Pong";
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
@@ -279,8 +230,7 @@ int main(int argc, char *argv[])
     }
 
     // register signal handler
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
+    struct sigaction sa = {};
     sa.sa_handler = signal_handler;
     sigaction(SIGHUP, &sa, NULL);  // terminal line hangup (1)
     sigaction(SIGQUIT, &sa, NULL); // quit program (3)

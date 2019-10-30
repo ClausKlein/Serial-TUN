@@ -44,7 +44,7 @@ int tun_open_common(
     }
 
     // Ask the kernel to create the new device
-    int err = ioctl(fileDescriptor, TUNSETIFF, (void *)&ifr);
+    int err = ioctl(fileDescriptor, TUNSETIFF, &ifr);
     if (err < 0) {
         // If something went wrong close the file and return
         perror("ioctl TUNSETIFF");
@@ -83,7 +83,7 @@ int tun_open_common(
                  i);
         /* Open device */
         if ((fd = open(tunname, O_RDWR | O_CLOEXEC)) > 0) {
-            strcpy(dev, tunname + 5); // !OLINT
+            strcpy(dev, tunname + 5); // NOLINT: offset 5 is OK! CK
             return fd;
         }
 
