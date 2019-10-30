@@ -12,7 +12,8 @@
 #ifdef __linux__
 #    include <linux/if_tun.h>
 
-int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
+int tun_open_common(
+    char *dev, enum tun_mode_t mode) // NOLINT(readability-non-const-parameter)
 {
     if ((mode != VTUN_ETHER) && (mode != VTUN_P2P)) {
         return -1;
@@ -61,7 +62,8 @@ int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
 
 #else
 
-int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
+int tun_open_common(
+    char *dev, enum tun_mode_t mode) // NOLINT(readability-non-const-parameter)
 {
     if ((mode != VTUN_ETHER) && (mode != VTUN_P2P)) {
         return -1;
@@ -81,7 +83,7 @@ int tun_open_common(char dev[IF_NAMESIZE], enum tun_mode_t mode)
                  i);
         /* Open device */
         if ((fd = open(tunname, O_RDWR | O_CLOEXEC)) > 0) {
-            strcpy(dev, tunname + 5); // NOLINT
+            strcpy(dev, tunname + 5); // !OLINT
             return fd;
         }
 

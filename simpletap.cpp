@@ -16,38 +16,48 @@ using namespace std::literals;
 class ExtensionPoint
 {
 public:
-    enum Channel {IN_BOUND = 0, OUT_BOUND = 1};
+    enum Channel
+    {
+        IN_BOUND = 0,
+        OUT_BOUND = 1
+    };
 
     ExtensionPoint() {}
     virtual ~ExtensionPoint() {}
 
-    virtual ssize_t read(Channel fd, void *buf, size_t count) = 0;
-    virtual ssize_t write (Channel fd, const void *buf, size_t count) = 0;
+    virtual ssize_t read(Channel fd, void *buf, size_t count) noexcept = 0;
+    virtual ssize_t write(Channel fd, const void *buf,
+                          size_t count) noexcept = 0;
 };
 
-class Pipe: public ExtensionPoint
+class Pipe : public ExtensionPoint
 {
 public:
-    Pipe() {
+    Pipe()
+    {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         if (pipe_open(fd) < 0) {
-        // TODO throw ...
+            // TODO: Trace, log ...
         }
     }
 
-    ~Pipe() {
+    ~Pipe() override
+    {
         close(fd[IN_BOUND]);
         close(fd[OUT_BOUND]);
     }
 
-    ssize_t read(Channel id, void *buf, size_t count) override {
+    ssize_t read(Channel id, void *buf, size_t count) noexcept override
+    {
         return ::read(fd[id], buf, count);
     }
-    ssize_t write(Channel id, const void *buf, size_t count) override {
+    ssize_t write(Channel id, const void *buf, size_t count) noexcept override
+    {
         return ::write(fd[id], buf, count);
     }
 
 private:
-    int fd[2] {-1, -1};
+    int fd[2]{-1, -1};
 };
 
 class CommDevices
@@ -55,9 +65,11 @@ class CommDevices
 public:
     typedef std::shared_ptr<ExtensionPoint> extensionPtr_t;
 
-    CommDevices(int tapFd, int serialFd, enum tun_mode_t _mode, extensionPtr_t optional)
-    : tapFileDescriptor(tapFd), serialFileDescriptor(serialFd), mode(_mode), extensionPoint(optional)
-    { }
+    CommDevices(int tapFd, int serialFd, enum tun_mode_t _mode,
+                extensionPtr_t optional)
+        : tapFileDescriptor(tapFd), serialFileDescriptor(serialFd), mode(_mode),
+          extensionPoint(optional)
+    {}
 
     void serialToTap();
     void tapToSerial();
@@ -83,7 +95,8 @@ static void signal_handler(int sig)
 }
 
 /**
- * Handles getting packets from the serial port and writing them to the TAP interface
+ * Handles getting packets from the serial port and writing them to the TAP
+ * interface
  */
 void CommDevices::serialToTap()
 {
@@ -106,6 +119,7 @@ void CommDevices::serialToTap()
 #ifndef NDEBUG
             if (this->mode == VTUN_PIPE) {
                 char msg[] = "Hallo again";
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                 (void)frame_write(tapFd, msg, sizeof(msg));
             }
 #endif
@@ -130,7 +144,8 @@ void CommDevices::serialToTap()
 }
 
 /**
- * Handles getting packets from the TAP interface and writing them to the serial port
+ * Handles getting packets from the TAP interface and writing them to the serial
+ * port
  */
 void CommDevices::tapToSerial()
 {
@@ -179,16 +194,21 @@ void CommDevices::tapToSerial()
 int main(int argc, char *argv[])
 {
     enum tun_mode_t mode = VTUN_ETHER;
+    bool red_node = false;
 
     // Grab parameters
     int param;
-    while ((param = getopt(argc, argv, "i:d:pv")) > 0) {
+    while ((param = getopt(argc, argv, "i:d:prv")) > 0) {
         switch (param) {
         case 'i':
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             strncpy(adapterName, optarg, IF_NAMESIZE - 1);
             break;
         case 'd':
             strncpy(serialDevice, optarg, sizeof(serialDevice) - 1);
+            break;
+        case 'r':
+            red_node = true;
             break;
         case 'p':
             mode = VTUN_PIPE;
@@ -197,7 +217,8 @@ int main(int argc, char *argv[])
             spdlog::set_level(spdlog::level::trace); // Set global log level
             break;
         default:
-            fprintf(stderr, "Usage: %s -i tun0 -d /dev/spidip2.0 [-p] [-v]\n",
+            fprintf(stderr,
+                    "Usage: %s -i tun0 -d /dev/spidip2.0 [-r] [-p] [-v]\n",
                     *argv);
             return EXIT_FAILURE;
         }
@@ -217,6 +238,7 @@ int main(int argc, char *argv[])
 
     int fd[2] = {-1, -1};
     if (mode == VTUN_PIPE) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         if (pipe_open(fd) < 0) {
             fprintf(stderr, "Can't create pipe. %s(%d)", strerror(errno),
                     errno);
@@ -224,6 +246,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     int tapFd = tun_open_common(adapterName, mode);
     if (tapFd < 0) {
         perror(adapterName);
@@ -235,6 +258,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Test mode, use VTUN_PIPE first end!\n");
         tapFd = fd[0];
         char pingMsg[] = "\x05\0Ping";
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         (void)write_n(tapFd, pingMsg, sizeof(pingMsg));
     }
 
@@ -250,6 +274,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Test mode, use VTUN_PIPE second end!\n");
         serialFd = fd[1];
         char pingMsg[] = "Pong";
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         (void)frame_write(serialFd, pingMsg, sizeof(pingMsg));
     }
 
@@ -265,22 +290,27 @@ int main(int argc, char *argv[])
     // FIXME sigaction(SIGTERM, &sa, NULL); // software termination signal (15)
 
     SPDLOG_INFO("Starting threads");
-    try
-    {
-        // Create threads
-        //TODO if (black_node)
-            // CommDevices threadParams(tapFd, serialFd, mode, std::shared_ptr<Pipe>());
-        // TODO else
-        CommDevices threadParams(tapFd, serialFd, mode, std::make_shared<Pipe>());
+    try {
+        CommDevices::extensionPtr_t
+            extension; // default = std::shared_ptr<Pipe>();
+        if (red_node) {
+            extension = std::make_shared<Pipe>();
+        }
+        CommDevices threadParams(tapFd, serialFd, mode, extension);
 
-        std::thread tap2serial(std::bind(&CommDevices::tapToSerial, threadParams));
-        std::thread serial2tap(std::bind(&CommDevices::serialToTap, threadParams));
+        // Create threads
+        std::thread tap2serial(
+            std::bind(&CommDevices::tapToSerial, threadParams));
+        std::thread serial2tap(
+            std::bind(&CommDevices::serialToTap, threadParams));
 
         if (mode == VTUN_PIPE) {
             alarm(4); // NOTE: XXX watchdog timer: send unhandled SIGALRM after
                       // 4 sec! CK
             char msg[] = "Hallo\n";
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             pipe_write(1, msg, sizeof(msg)); // stdout
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             if (readn_t(0, msg, sizeof(msg), 3) < 0) {
                 SPDLOG_INFO("Timeout while read from stdin");
             } else {
@@ -300,9 +330,7 @@ int main(int argc, char *argv[])
         close(serialFd);
 
         return EXIT_SUCCESS;
-    }
-    catch(std::exception & e)
-    {
+    } catch (std::exception &e) {
         SPDLOG_ERROR("Exception {}", e.what());
     }
 

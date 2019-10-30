@@ -23,6 +23,7 @@ int read_n(int fd, char *buf, size_t len)
         }
 
         len -= rlen;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         buf += rlen;
         res += rlen;
     }
@@ -49,6 +50,7 @@ int write_n(int fd, char *buf, size_t len)
         }
 
         len -= wlen;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         buf += wlen;
         res += wlen;
     }
@@ -71,6 +73,7 @@ ssize_t frame_write(int fd, char *buf, size_t len)
 
     while (io_is_enabled()) {
         ssize_t wlen;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         if ((wlen = writev(fd, iv, 2)) < 0) {
             if (errno == EAGAIN || errno == EINTR) {
                 SPDLOG_DEBUG("EAGAIN|EINTR = writev()");
@@ -110,6 +113,7 @@ ssize_t frame_read(int fd, char *buf, size_t len)
 
     while (io_is_enabled()) {
         ssize_t rlen;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         if ((rlen = readv(fd, iv, 2)) < 0) {
             if (errno == EAGAIN || errno == EINTR) {
                 SPDLOG_DEBUG("EAGAIN|EINTR = readv()");
@@ -137,7 +141,8 @@ ssize_t frame_read(int fd, char *buf, size_t len)
 int readn_t(int fd, char *buf, size_t count, time_t timeout)
 {
     fd_set fdset;
-    struct timeval tv;
+    struct timeval tv
+    {};
 
     tv.tv_usec = 0;
     tv.tv_sec = timeout;

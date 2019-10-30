@@ -2,25 +2,26 @@
 Checks: "-*,\
 cert-*,\
 misc-*,\
+-misc-unused-parameters,\
 modernize-*,\
 -modernize-raw-string-literal,\
 -modernize-return-braced-init-list,\
 -modernize-use-auto,\
+-modernize-use-default-member-init,\
 -modernize-use-equals-default,\
 -modernize-use-equals-delete,\
--modernize-use-default-member-init,\
 -modernize-use-nullptr,\
+-modernize-use-trailing-return-type,\
 -modernize-use-using,\
 performance-*,\
 readability-*,\
 -readability-named-parameter,\
 -readability-braces-around-statements,\
 -readability-implicit-bool-conversion,\
-readability-else-after-return,\
 cppcoreguidelines-*,\
 -cppcoreguidelines-owning-memory,\
 -cppcoreguidelines-special-member-functions,\
--cppcoreguidelines-pro-*\
++cppcoreguidelines-pro-*\
 "
 HeaderFilterRegex: '.*'
 ...
