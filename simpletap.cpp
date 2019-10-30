@@ -27,7 +27,8 @@ public:
     void serialToTap();
     void tapToSerial();
 
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,
+    // readability-magic-numbers)
     static void wait100ms() { std::this_thread::sleep_for(100ms); }
 
 private:

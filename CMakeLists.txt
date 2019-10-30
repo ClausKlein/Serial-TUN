@@ -16,7 +16,7 @@ include(build_options OPTIONAL)
 # Compiler config
 #---------------------------------------------------------------------------------------
 if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 14)
+    set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CMAKE_CXX_EXTENSIONS OFF)
     set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wpedantic")
@@ -32,7 +32,7 @@ find_file(SerialPort_header libserialport.h)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "Coverage")
     if(SerialPort_lib)
-        set(SOURCE_FILES serial_tun.cpp tun-driver.cpp tun-driver.h ${SerialPort_header} slip.cpp slip.h)
+        set(SOURCE_FILES serial_tun.cpp ExtensionPoint.h tun-driver.cpp tun-driver.h ${SerialPort_header} slip.cpp slip.h)
         add_executable(serial_tun ${SOURCE_FILES})
         target_link_libraries(serial_tun ${SerialPort_lib} Threads::Threads)
     endif()
