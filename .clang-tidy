@@ -21,7 +21,7 @@ readability-*,\
 cppcoreguidelines-*,\
 -cppcoreguidelines-owning-memory,\
 -cppcoreguidelines-special-member-functions,\
-+cppcoreguidelines-pro-*\
+-cppcoreguidelines-pro-bounds-array-to-pointer-decay\
 "
 HeaderFilterRegex: '.*'
 ...

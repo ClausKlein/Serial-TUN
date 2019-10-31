@@ -86,6 +86,10 @@ if (NOT TARGET spdlog::spdlog_header_only)
 endif()
 
 
+if(NOT EXECUTABLE_OUTPUT_PATH)
+    set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
+endif()
+
 add_executable(simpletap simpletap.cpp tun-lib.cpp tun-driver.cpp tun-driver.h)
 target_link_libraries(simpletap PRIVATE spdlog::spdlog_header_only Threads::Threads)
 set_target_properties(simpletap PROPERTIES CXX_STANDARD 14)
@@ -120,7 +124,7 @@ if(SERIAL_TUN_BUILD_TESTS)
     endif()
 
     add_test(NAME simpletapPipe COMMAND simpletap -d /dev/XXX -i YYY -p)
-    add_test(NAME test_setup COMMAND ${CMAKE_SOURCE_DIR}/setup.sh ${CMAKE_BINARY_DIR}/bin/simpletap )
+    add_test(NAME test_setup COMMAND ${CMAKE_SOURCE_DIR}/setup.sh ${EXECUTABLE_OUTPUT_PATH}/simpletap )
 
     add_executable(test_slip test_slip.cpp slip.cpp slip.h)
     target_link_libraries(test_slip PRIVATE doctest::doctest)

@@ -26,9 +26,10 @@ public:
 
     void serialToTap();
     void tapToSerial();
+    void readInBound();
+    void readOutBound();
 
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,
-    // readability-magic-numbers)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
     static void wait100ms() { std::this_thread::sleep_for(100ms); }
 
 private:
@@ -73,26 +74,35 @@ void CommDevices::serialToTap()
 
 #ifndef NDEBUG
             if (this->mode == VTUN_PIPE) {
-                char msg[] = "Hallo again";
+                char pingMsg[] = "\x05\0TapPing";
                 // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-                (void)frame_write(tapFd, msg, sizeof(msg));
+                serialResult = sizeof(pingMsg);
+                memcpy(inBuffer.data(), pingMsg, sizeof(pingMsg));
             }
-#endif
-
+#else
             continue;
+#endif
         }
 
         // Write the packet to the virtual interface
-        ssize_t count = write(tapFd, inBuffer.data(), serialResult);
+        ssize_t count;
+        if (extensionPoint.get() != nullptr) {
+            count = extensionPoint->write(ExtensionPoint::IN_BOUND,
+                                          inBuffer.data(), serialResult);
+        } else {
+            count = write(tapFd, inBuffer.data(), serialResult);
+        }
         if (count != serialResult) {
-            SPDLOG_ERROR("TAP write error({}) {}", errno, strerror(errno));
+            SPDLOG_ERROR("InBound write error({}) {}", errno, strerror(errno));
             wait100ms();
             continue;
         }
 
+#ifndef NDEBUG
         SPDLOG_TRACE(
             "serialToTap {}:{:n}", count,
             spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
+#endif
     }
 
     SPDLOG_INFO("serialToTap thread stopped");
@@ -123,27 +133,96 @@ void CommDevices::tapToSerial()
         // Write to serial port
         ssize_t serialResult;
 
+        if (extensionPoint.get() != nullptr) {
+            serialResult = extensionPoint->write(ExtensionPoint::OUT_BOUND,
+                                                 inBuffer.data(), count);
 #ifndef NDEBUG
-        if (this->mode == VTUN_PIPE) {
+        } else if (this->mode == VTUN_PIPE) {
             serialResult = pipe_write(serialFd, inBuffer.data(), count);
-        } else
 #endif
 
-        {
+        } else {
             serialResult = frame_write(serialFd, inBuffer.data(), count);
         }
         if (serialResult < 0) {
-            SPDLOG_ERROR("Serial write error({}) {}", errno, strerror(errno));
+            SPDLOG_ERROR("OutBound write error({}) {}", errno, strerror(errno));
             wait100ms();
             continue;
         }
 
+#ifndef NDEBUG
         SPDLOG_TRACE(
             "tapToSerial {}:{:n}", count,
             spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
+#endif
     }
 
     SPDLOG_INFO("tapToSerial thread stopped");
+}
+
+void CommDevices::readInBound()
+{
+    // Grab thread parameters
+    if (extensionPoint.get() == nullptr)
+        return;
+
+    // Create TAP buffer
+    std::array<char, ETHER_FRAME_LENGTH> inBuffer{};
+
+    while (io_is_enabled()) {
+        // Read incoming byte count
+        ssize_t result = extensionPoint->read(ExtensionPoint::OUT_BOUND,
+                                              inBuffer.data(), inBuffer.size());
+        if (result <= 0) {
+            SPDLOG_ERROR("readInBound: read error({}) {}", errno,
+                         strerror(errno));
+            wait100ms();
+            continue;
+        }
+
+        // Write the packet to the virtual interface
+        ssize_t count = write(tapFileDescriptor, inBuffer.data(), result);
+        if (count != result) {
+            SPDLOG_ERROR("TAP write error({}) {}", errno, strerror(errno));
+            wait100ms();
+            continue;
+        }
+    }
+
+    SPDLOG_INFO("readInBound thread stopped");
+}
+
+void CommDevices::readOutBound()
+{
+    // Grab thread parameters
+    if (extensionPoint.get() == nullptr)
+        return;
+
+    // Create TAP buffer
+    std::array<char, ETHER_FRAME_LENGTH> inBuffer{};
+
+    while (io_is_enabled()) {
+        // read outgoing byte count
+        ssize_t count =
+            read(serialFileDescriptor, inBuffer.data(), inBuffer.size());
+        if (count <= 0) {
+            SPDLOG_ERROR("Serial read error({}) {}", errno, strerror(errno));
+            wait100ms();
+            continue;
+        }
+
+        // Write outgoing packet
+        ssize_t result = extensionPoint->write(ExtensionPoint::IN_BOUND,
+                                               inBuffer.data(), count);
+        if (result < 0) {
+            SPDLOG_ERROR("readOutBound: write error({}) {}", errno,
+                         strerror(errno));
+            wait100ms();
+            continue;
+        }
+    }
+
+    SPDLOG_INFO("readOutBound thread stopped");
 }
 
 int main(int argc, char *argv[])
@@ -179,13 +258,6 @@ int main(int argc, char *argv[])
         }
     }
 
-#if defined(__linux__) && defined(NOT_YET)
-    if (adapterName[0] == '\0') {
-        fprintf(stderr, "Tuntap interface name required (-i)\n");
-        return EXIT_FAILURE;
-    }
-#endif
-
     if (serialDevice[0] == '\0') {
         fprintf(stderr, "Serial port required (-d)\n");
         return EXIT_FAILURE;
@@ -210,7 +282,7 @@ int main(int argc, char *argv[])
 
         SPDLOG_INFO("Test mode, use VTUN_PIPE first end!");
         tapFd = fd[0];
-        char pingMsg[] = "\x05\0Ping";
+        char pingMsg[] = "\x05\0TapPing";
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         (void)write_n(tapFd, pingMsg, sizeof(pingMsg));
     }
@@ -225,7 +297,7 @@ int main(int argc, char *argv[])
 
         SPDLOG_INFO("Test mode, use VTUN_PIPE second end!");
         serialFd = fd[1];
-        char pingMsg[] = "Pong";
+        char pingMsg[] = "SerialPong";
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         (void)frame_write(serialFd, pingMsg, sizeof(pingMsg));
     }
@@ -242,8 +314,7 @@ int main(int argc, char *argv[])
 
     SPDLOG_INFO("Starting threads");
     try {
-        CommDevices::extensionPtr_t
-            extension; // default = std::shared_ptr<Pipe>();
+        CommDevices::extensionPtr_t extension;
         if (red_node) {
             extension = std::make_shared<Pipe>();
         }
@@ -254,13 +325,21 @@ int main(int argc, char *argv[])
             std::bind(&CommDevices::tapToSerial, threadParams));
         std::thread serial2tap(
             std::bind(&CommDevices::serialToTap, threadParams));
+        if (red_node) {
+            std::thread outBound(
+                std::bind(&CommDevices::readOutBound, threadParams));
+            std::thread inBound(
+                std::bind(&CommDevices::readInBound, threadParams));
+            outBound.detach();
+            inBound.detach();
+        }
 
         if (mode == VTUN_PIPE) {
             alarm(4); // NOTE: XXX watchdog timer: send unhandled SIGALRM after
                       // 4 sec! CK
             char msg[] = "Hallo\n";
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-            pipe_write(1, msg, sizeof(msg)); // stdout
+            (void)write_n(1, msg, sizeof(msg)); // stdout
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             if (readn_t(0, msg, sizeof(msg), 3) < 0) {
                 SPDLOG_INFO("Timeout while read from stdin");
@@ -270,6 +349,7 @@ int main(int argc, char *argv[])
 
             shutdown(serialFd, SHUT_WR);
             shutdown(tapFd, SHUT_WR);
+            extension.reset();
         }
 
         tap2serial.join();

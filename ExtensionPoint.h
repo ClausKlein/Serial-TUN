@@ -40,13 +40,15 @@ public:
 
     ssize_t read(Channel id, void *buf, size_t count) noexcept override
     {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         return ::read(fd[id], buf, count);
     }
     ssize_t write(Channel id, const void *buf, size_t count) noexcept override
     {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         return ::write(fd[id], buf, count);
     }
 
 private:
-    std::array<int, 2> fd{-1, -1};
+    std::array<int, 2> fd{{-1, -1}};
 };

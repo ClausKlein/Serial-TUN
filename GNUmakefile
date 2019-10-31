@@ -40,6 +40,8 @@ GENERATOR?=Ninja
 BUILD_DIR:=../.build-$(PROJECT_NAME)-$(BUILD_TYPE)
 ifeq ($(BUILD_TYPE),Coverage)
     USE_LOV=ON
+    CC:=/usr/bin/gcc
+    CXX:=/usr/bin/g++
 else
     USE_LOV=OFF
 endif
