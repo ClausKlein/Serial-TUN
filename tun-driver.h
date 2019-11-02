@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <net/if.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 constexpr uint16_t ETHER_FRAME_LEN_MASK(0x7fff);
@@ -50,7 +51,10 @@ int write_n(int fd, char *buf, size_t len);
  */
 static inline int pipe_open(int *fd)
 {
-    return socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
+#ifndef SOCK_CLOEXEC
+    constexpr int SOCK_CLOEXEC(0);
+#endif
+    return socketpair(AF_UNIX, SOCK_STREAM, SOCK_CLOEXEC, fd);
 }
 
 /* Write frames to pipe */

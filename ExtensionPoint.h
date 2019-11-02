@@ -10,8 +10,8 @@ class ExtensionPoint
 public:
     enum Channel
     {
-        IN_BOUND = 0,
-        OUT_BOUND = 1
+        OUTER = 0,
+        INNER = 1
     };
 
     ExtensionPoint() {}
@@ -34,8 +34,8 @@ public:
 
     ~Pipe() override
     {
-        close(fd[IN_BOUND]);
-        close(fd[OUT_BOUND]);
+        close(fd[OUTER]);
+        close(fd[INNER]);
     }
 
     ssize_t read(Channel id, void *buf, size_t count) noexcept override

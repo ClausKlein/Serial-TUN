@@ -30,7 +30,8 @@ fi
 ${1} -i tap0 -h || echo "OK"
 ${1} -i XXX -p || echo "ERROR IGNORED"
 ${1} -d /dev/tty1 || echo "ERROR IGNORED"
-echo "PIPE_TEST" | ${1} -d /dev/XXX -i XXX -p -r || echo "ERROR IGNORED"
+echo "PIPE_TEST" | ${1} -d /dev/XXX -i XXX -p
+echo "RED_EXTENSION_POINT_TEST" | ${1} -d /dev/XXX -i XXX -p -r
 
 #TODO Start in background
 ${1} -i tap0 -d /dev/qspi_bypass -v || echo "ERROR IGNORED"

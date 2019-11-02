@@ -32,7 +32,9 @@ find_file(SerialPort_header libserialport.h)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "Coverage")
     if(SerialPort_lib)
-        set(SOURCE_FILES serial_tun.cpp ExtensionPoint.h tun-driver.cpp tun-driver.h ${SerialPort_header} slip.cpp slip.h)
+        set(SOURCE_FILES serial_tun.cpp tun-driver.cpp tun-driver.h
+            ${SerialPort_header} slip.cpp slip.h
+        )
         add_executable(serial_tun ${SOURCE_FILES})
         target_link_libraries(serial_tun ${SerialPort_lib} Threads::Threads)
     endif()
@@ -72,7 +74,7 @@ endif()
 
 if(SERIAL_TUN_MASTER_PROJECT)
     find_package(spdlog 1.4.2 QUIET)
-    if (NOT TARGET spdlog::spdlog_header_only)
+    if(NOT TARGET spdlog::spdlog_header_only)
         fetchcontent_declare(
             spdlog
             GIT_REPOSITORY https://github.com/gabime/spdlog.git
@@ -81,7 +83,7 @@ if(SERIAL_TUN_MASTER_PROJECT)
         fetchcontent_makeavailable(spdlog)
     endif()
 endif()
-if (NOT TARGET spdlog::spdlog_header_only)
+if(NOT TARGET spdlog::spdlog_header_only)
     find_package(spdlog 1.4.2 REQUIRED)
 endif()
 
@@ -90,7 +92,7 @@ if(NOT EXECUTABLE_OUTPUT_PATH)
     set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 endif()
 
-add_executable(simpletap simpletap.cpp tun-lib.cpp tun-driver.cpp tun-driver.h)
+add_executable(simpletap simpletap.cpp ExtensionPoint.h tun-lib.cpp tun-driver.cpp tun-driver.h)
 target_link_libraries(simpletap PRIVATE spdlog::spdlog_header_only Threads::Threads)
 set_target_properties(simpletap PROPERTIES CXX_STANDARD 14)
 
@@ -111,7 +113,7 @@ if(SERIAL_TUN_BUILD_TESTS)
     enable_testing()
 
     find_package(doctest 2.3.5 QUIET)
-    if (NOT TARGET doctest::doctest)
+    if(NOT TARGET doctest::doctest)
         fetchcontent_declare(
             doctest
             GIT_REPOSITORY https://github.com/onqtam/doctest.git
@@ -119,12 +121,12 @@ if(SERIAL_TUN_BUILD_TESTS)
         )
         fetchcontent_makeavailable(doctest)
     endif()
-    if (NOT TARGET doctest::doctest)
+    if(NOT TARGET doctest::doctest)
         find_package(doctest 2.3.5 REQUIRED)
     endif()
 
     add_test(NAME simpletapPipe COMMAND simpletap -d /dev/XXX -i YYY -p)
-    add_test(NAME test_setup COMMAND ${CMAKE_SOURCE_DIR}/setup.sh ${EXECUTABLE_OUTPUT_PATH}/simpletap )
+    add_test(NAME test_setup COMMAND ${CMAKE_SOURCE_DIR}/setup.sh ${EXECUTABLE_OUTPUT_PATH}/simpletap)
 
     add_executable(test_slip test_slip.cpp slip.cpp slip.h)
     target_link_libraries(test_slip PRIVATE doctest::doctest)

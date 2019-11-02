@@ -73,6 +73,7 @@ void CommDevices::serialToTap()
             wait100ms();
 
 #ifndef NDEBUG
+        // selftest only:
             if (this->mode == VTUN_PIPE) {
                 char pingMsg[] = "\x05\0TapPing";
                 // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
@@ -87,7 +88,7 @@ void CommDevices::serialToTap()
         // Write the packet to the virtual interface
         ssize_t count;
         if (extensionPoint.get() != nullptr) {
-            count = extensionPoint->write(ExtensionPoint::IN_BOUND,
+            count = extensionPoint->write(ExtensionPoint::OUTER,
                                           inBuffer.data(), serialResult);
         } else {
             count = write(tapFd, inBuffer.data(), serialResult);
@@ -99,9 +100,12 @@ void CommDevices::serialToTap()
         }
 
 #ifndef NDEBUG
-        SPDLOG_TRACE(
-            "serialToTap {}:{:n}", count,
-            spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
+        if (extensionPoint.get() == nullptr) {
+            SPDLOG_TRACE(" serialToTap {}:{:n}", count,
+                         spdlog::to_hex(std::begin(inBuffer),
+                                        std::begin(inBuffer) + count));
+            wait100ms();
+        }
 #endif
     }
 
@@ -132,11 +136,11 @@ void CommDevices::tapToSerial()
 
         // Write to serial port
         ssize_t serialResult;
-
         if (extensionPoint.get() != nullptr) {
-            serialResult = extensionPoint->write(ExtensionPoint::OUT_BOUND,
+            serialResult = extensionPoint->write(ExtensionPoint::INNER,
                                                  inBuffer.data(), count);
 #ifndef NDEBUG
+        // selftest only:
         } else if (this->mode == VTUN_PIPE) {
             serialResult = pipe_write(serialFd, inBuffer.data(), count);
 #endif
@@ -151,45 +155,16 @@ void CommDevices::tapToSerial()
         }
 
 #ifndef NDEBUG
-        SPDLOG_TRACE(
-            "tapToSerial {}:{:n}", count,
-            spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
+        if (extensionPoint.get() == nullptr) {
+            SPDLOG_TRACE(" tapToSerial {}:{:n}", count,
+                         spdlog::to_hex(std::begin(inBuffer),
+                                        std::begin(inBuffer) + count));
+            wait100ms();
+        }
 #endif
     }
 
     SPDLOG_INFO("tapToSerial thread stopped");
-}
-
-void CommDevices::readInBound()
-{
-    // Grab thread parameters
-    if (extensionPoint.get() == nullptr)
-        return;
-
-    // Create TAP buffer
-    std::array<char, ETHER_FRAME_LENGTH> inBuffer{};
-
-    while (io_is_enabled()) {
-        // Read incoming byte count
-        ssize_t result = extensionPoint->read(ExtensionPoint::OUT_BOUND,
-                                              inBuffer.data(), inBuffer.size());
-        if (result <= 0) {
-            SPDLOG_ERROR("readInBound: read error({}) {}", errno,
-                         strerror(errno));
-            wait100ms();
-            continue;
-        }
-
-        // Write the packet to the virtual interface
-        ssize_t count = write(tapFileDescriptor, inBuffer.data(), result);
-        if (count != result) {
-            SPDLOG_ERROR("TAP write error({}) {}", errno, strerror(errno));
-            wait100ms();
-            continue;
-        }
-    }
-
-    SPDLOG_INFO("readInBound thread stopped");
 }
 
 void CommDevices::readOutBound()
@@ -198,31 +173,75 @@ void CommDevices::readOutBound()
     if (extensionPoint.get() == nullptr)
         return;
 
-    // Create TAP buffer
+    // Create outgoing buffer
     std::array<char, ETHER_FRAME_LENGTH> inBuffer{};
 
     while (io_is_enabled()) {
-        // read outgoing byte count
-        ssize_t count =
-            read(serialFileDescriptor, inBuffer.data(), inBuffer.size());
+        // Read outgoing byte count
+        ssize_t result = extensionPoint->read(ExtensionPoint::OUTER,
+                                              inBuffer.data(), inBuffer.size());
+        if (result <= 0) {
+            SPDLOG_ERROR("OutBound: read error({}) {}", errno, strerror(errno));
+            wait100ms();
+            continue;
+        }
+
+        // Write the packet to the serial interface
+        ssize_t count = write(serialFileDescriptor, inBuffer.data(), result);
+        if (count != result) {
+            SPDLOG_ERROR("Serial write error({}) {}", errno, strerror(errno));
+            wait100ms();
+            continue;
+        }
+
+#ifndef NDEBUG
+        SPDLOG_TRACE(
+            "readOutBound {}:{:n}", count,
+            spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
+        wait100ms();
+#endif
+    }
+
+    SPDLOG_INFO("readOutBound thread stopped");
+}
+
+void CommDevices::readInBound()
+{
+    // Grab thread parameters
+    if (extensionPoint.get() == nullptr)
+        return;
+
+    // Create incomming buffer
+    std::array<char, ETHER_FRAME_LENGTH> inBuffer{};
+
+    while (io_is_enabled()) {
+        // read incomming byte count
+        ssize_t count = extensionPoint->read(ExtensionPoint::INNER,
+                                             inBuffer.data(), inBuffer.size());
         if (count <= 0) {
-            SPDLOG_ERROR("Serial read error({}) {}", errno, strerror(errno));
+            SPDLOG_ERROR("InBound: read error({}) {}", errno, strerror(errno));
             wait100ms();
             continue;
         }
 
         // Write outgoing packet
-        ssize_t result = extensionPoint->write(ExtensionPoint::IN_BOUND,
-                                               inBuffer.data(), count);
+        ssize_t result = write(tapFileDescriptor, inBuffer.data(), count);
         if (result < 0) {
-            SPDLOG_ERROR("readOutBound: write error({}) {}", errno,
+            SPDLOG_ERROR("readInBound: write error({}) {}", errno,
                          strerror(errno));
             wait100ms();
             continue;
         }
+
+#ifndef NDEBUG
+        SPDLOG_TRACE(
+            " readInBound {}:{:n}", count,
+            spdlog::to_hex(std::begin(inBuffer), std::begin(inBuffer) + count));
+        wait100ms();
+#endif
     }
 
-    SPDLOG_INFO("readOutBound thread stopped");
+    SPDLOG_INFO("readInBound thread stopped");
 }
 
 int main(int argc, char *argv[])
@@ -245,6 +264,7 @@ int main(int argc, char *argv[])
             red_node = true;
             break;
         case 'p':
+            // selftest only:
             mode = VTUN_PIPE;
             // fallthrough
         case 'v':
@@ -259,10 +279,11 @@ int main(int argc, char *argv[])
     }
 
     if (serialDevice[0] == '\0') {
-        fprintf(stderr, "Serial port required (-d)\n");
+        fprintf(stderr, "Serial port required (-d /dev/name)\n");
         return EXIT_FAILURE;
     }
 
+    // NOTE: selftest only:
     int fd[2] = {-1, -1};
     if (mode == VTUN_PIPE) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
@@ -280,6 +301,7 @@ int main(int argc, char *argv[])
             return EXIT_FAILURE;
         }
 
+        // NOTE: selftest only:
         SPDLOG_INFO("Test mode, use VTUN_PIPE first end!");
         tapFd = fd[0];
         char pingMsg[] = "\x05\0TapPing";
@@ -295,6 +317,7 @@ int main(int argc, char *argv[])
             return EXIT_FAILURE;
         }
 
+        // NOTE: selftest only:
         SPDLOG_INFO("Test mode, use VTUN_PIPE second end!");
         serialFd = fd[1];
         char pingMsg[] = "SerialPong";
@@ -325,15 +348,18 @@ int main(int argc, char *argv[])
             std::bind(&CommDevices::tapToSerial, threadParams));
         std::thread serial2tap(
             std::bind(&CommDevices::serialToTap, threadParams));
-        if (red_node) {
+
+        // NOTE: selftest only:
+        if (red_node || (mode == VTUN_PIPE)) {
             std::thread outBound(
                 std::bind(&CommDevices::readOutBound, threadParams));
+            outBound.detach();
             std::thread inBound(
                 std::bind(&CommDevices::readInBound, threadParams));
-            outBound.detach();
             inBound.detach();
         }
 
+        // NOTE: selftest only:
         if (mode == VTUN_PIPE) {
             alarm(4); // NOTE: XXX watchdog timer: send unhandled SIGALRM after
                       // 4 sec! CK
