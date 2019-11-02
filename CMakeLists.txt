@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.13.1)
 
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 list(APPEND CMAKE_MODULE_PATH $ENV{HOME}/Workspace/cmake)
 list(APPEND CMAKE_MODULE_PATH $ENV{HOME}/cmake)
 list(APPEND CMAKE_MODULE_PATH /usr/local/lib/cmake)
