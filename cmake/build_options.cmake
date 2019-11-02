@@ -21,11 +21,28 @@ if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
 endif()
 
 
+#----------------------------------------------------------------------------
+# Compiler config
+#----------------------------------------------------------------------------
 option(CXX_STANDARD_REQUIRED "Require C++17 standard" ON)
 if(CXX_STANDARD_REQUIRED)
     set(CMAKE_CXX_STANDARD 17)  # Use C++17 standard
     set(CMAKE_CXX_EXTENSIONS OFF)
-    set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wpedantic")
+endif()
+
+option(COMPILER_WARNINGS_ARE_ERRORS "To be pedantic! ;-)" ON)
+if(COMPILER_WARNINGS_ARE_ERRORS)
+    if(MSVC)
+        # warning level 4 and all warnings as errors
+        add_compile_options(/W4 /WX)
+    else()
+        # lots of warnings and all warnings as errors
+        add_compile_options(-Wall -Wextra -Wpedantic -Werror
+          ##TBD -Wno-unknown-warning-option
+          -Wno-unused-parameter
+          -Wno-unused-variable
+        )
+    endif()
 endif()
 
 
@@ -51,7 +68,7 @@ if(USE_OUTPUT_PATH)
     # Where to put all the LIBRARY targets when built.  This variable is used
     # to initialize the LIBRARY_OUTPUT_DIRECTORY property on all the targets.
     # -----------------------------------------------------------------------
-    set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
+    set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
 
     # -----------------------------------------------------------------------
     # Make sure the linker can find a library once it is built.
@@ -59,10 +76,8 @@ if(USE_OUTPUT_PATH)
     link_directories(${LIBRARY_OUTPUT_PATH})
 
     # -----------------------------------------------------------------------
-
     # Where to put all the RUNTIME targets when built.  This variable is used
     # to initialize the RUNTIME_OUTPUT_DIRECTORY property on all the targets.
-
     # -----------------------------------------------------------------------
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 endif()

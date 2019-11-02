@@ -6,22 +6,11 @@ list(APPEND CMAKE_MODULE_PATH $ENV{HOME}/cmake)
 list(APPEND CMAKE_MODULE_PATH /usr/local/lib/cmake)
 
 
-include(before_project_setup OPTIONAL)
+include(before_project_setup)
 # ===============================
 project(serial_tun LANGUAGES CXX)
 # ===============================
-include(build_options OPTIONAL)
-
-
-#---------------------------------------------------------------------------------------
-# Compiler config
-#---------------------------------------------------------------------------------------
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 17)
-    set(CMAKE_CXX_STANDARD_REQUIRED ON)
-    set(CMAKE_CXX_EXTENSIONS OFF)
-    set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wpedantic")
-endif()
+include(build_options)
 
 
 #---------------------------------------------------------------------------------------
@@ -89,10 +78,6 @@ if(NOT TARGET spdlog::spdlog_header_only)
 endif()
 
 
-if(NOT EXECUTABLE_OUTPUT_PATH)
-    set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
-endif()
-
 add_executable(simpletap simpletap.cpp ExtensionPoint.h tun-lib.cpp tun-driver.cpp tun-driver.h)
 target_link_libraries(simpletap PRIVATE spdlog::spdlog_header_only Threads::Threads)
 set_target_properties(simpletap PROPERTIES CXX_STANDARD 14)
@@ -127,7 +112,9 @@ if(SERIAL_TUN_BUILD_TESTS)
     endif()
 
     add_test(NAME simpletapPipe COMMAND simpletap -d /dev/XXX -i YYY -p)
-    add_test(NAME test_setup COMMAND ${CMAKE_SOURCE_DIR}/setup.sh ${EXECUTABLE_OUTPUT_PATH}/simpletap)
+    add_test(NAME test_setup COMMAND ${CMAKE_SOURCE_DIR}/setup.sh
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/simpletap
+    )
 
     add_executable(test_slip test_slip.cpp slip.cpp slip.h)
     target_link_libraries(test_slip PRIVATE doctest::doctest)
@@ -153,9 +140,9 @@ if(SERIAL_TUN_BUILD_TESTS)
             EXECUTABLE ctest    # EXECUTABLE of the test driver executable that runs the tests.
                         # NOTE! This should always have a ZERO as exit code
                         # otherwise the coverage generation will not complete.
-            #NO YET! OUTDIR coverage   # Name of output directory.
+            #NO YET! OUTDIR ${CMAKE_SOURCE_DIR}/lcov   # Name of output directory.
         )
-    endif() #CMAKE_BUILD_TYPE STREQUAL "Coverage"
+    endif()
 endif()
 
 if(SERIAL_TUN_MASTER_PROJECT)
