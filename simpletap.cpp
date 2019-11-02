@@ -73,8 +73,8 @@ void CommDevices::serialToTap()
             wait100ms();
 
 #ifndef NDEBUG
-        // selftest only:
             if (this->mode == VTUN_PIPE) {
+                // selftest only:
                 char pingMsg[] = "\x05\0TapPing";
                 // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                 serialResult = sizeof(pingMsg);
@@ -140,8 +140,8 @@ void CommDevices::tapToSerial()
             serialResult = extensionPoint->write(ExtensionPoint::INNER,
                                                  inBuffer.data(), count);
 #ifndef NDEBUG
-        // selftest only:
         } else if (this->mode == VTUN_PIPE) {
+            // selftest only:
             serialResult = pipe_write(serialFd, inBuffer.data(), count);
 #endif
 
@@ -264,8 +264,7 @@ int main(int argc, char *argv[])
             red_node = true;
             break;
         case 'p':
-            // selftest only:
-            mode = VTUN_PIPE;
+            mode = VTUN_PIPE; // selftest only
             // fallthrough
         case 'v':
             spdlog::set_level(spdlog::level::trace); // Set global log level
