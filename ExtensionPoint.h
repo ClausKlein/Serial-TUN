@@ -2,6 +2,8 @@
 
 #include "tun-driver.h"
 
+// FIXME #include <boost/core/noncopyable.hpp>
+
 #include <array>
 #include <cerrno>
 
@@ -14,15 +16,23 @@ public:
         INNER = 1
     };
 
-    ExtensionPoint() {}
-    virtual ~ExtensionPoint() {}
+    ExtensionPoint(const ExtensionPoint &) = delete;
+    void operator=(const ExtensionPoint &) = delete;
+
+    ExtensionPoint(ExtensionPoint &&) = delete;
+    ExtensionPoint &operator=(ExtensionPoint &&) = delete;
+
+    virtual ~ExtensionPoint() = default;
 
     virtual ssize_t read(Channel fd, void *buf, size_t count) noexcept = 0;
     virtual ssize_t write(Channel fd, const void *buf,
                           size_t count) noexcept = 0;
+
+protected:
+    ExtensionPoint() = default;
 };
 
-class Pipe : public ExtensionPoint
+class Pipe : public ExtensionPoint // FIXME , private boost::noncopyable
 {
 public:
     Pipe()

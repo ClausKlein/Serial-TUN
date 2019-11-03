@@ -63,6 +63,16 @@ endif()
 
 
 if(SERIAL_TUN_MASTER_PROJECT)
+    find_package(gsl-lite 0.34.0 QUIET)
+    if(NOT TARGET gsl::gsl-lite)
+        fetchcontent_declare(
+            gsl-lite
+            GIT_REPOSITORY https://github.com/martinmoene/gsl-lite.git
+            GIT_TAG        0.34.0
+        )
+        fetchcontent_makeavailable(gsl-lite)
+    endif()
+
     find_package(spdlog 1.4.2 QUIET)
     if(NOT TARGET spdlog::spdlog_header_only)
         fetchcontent_declare(
@@ -76,10 +86,13 @@ endif()
 if(NOT TARGET spdlog::spdlog_header_only)
     find_package(spdlog 1.4.2 REQUIRED)
 endif()
+if(NOT TARGET gsl::gsl-lite)
+    find_package(gsl-lite 0.34.0 REQUIRED)
+endif()
 
 
 add_executable(simpletap simpletap.cpp ExtensionPoint.h tun-lib.cpp tun-driver.cpp tun-driver.h)
-target_link_libraries(simpletap PRIVATE spdlog::spdlog_header_only Threads::Threads)
+target_link_libraries(simpletap PRIVATE gsl::gsl-lite spdlog::spdlog_header_only Threads::Threads)
 set_target_properties(simpletap PROPERTIES CXX_STANDARD 14)
 
 # install options

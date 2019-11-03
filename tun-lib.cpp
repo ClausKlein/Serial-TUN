@@ -63,7 +63,7 @@ ssize_t frame_write(int fd, char *buf, size_t len)
 {
     struct iovec iv[2];
     ssize_t flen = (len & ETHER_FRAME_LEN_MASK) + sizeof(uint16_t);
-    uint16_t hdr = htons(len);
+    uint16_t hdr = htons(len); // NOLINT
 
     /* Write frame */
     iv[0].iov_len = sizeof(uint16_t);
@@ -122,7 +122,7 @@ ssize_t frame_read(int fd, char *buf, size_t len)
             return rlen;
         }
 
-        hdr = ntohs(hdr);
+        hdr = ntohs(hdr); // NOLINT
         ssize_t flen = hdr & ETHER_FRAME_LEN_MASK;
 
         // NOTE: sizeof(uint16_t) == 2;
@@ -147,6 +147,7 @@ int readn_t(int fd, char *buf, size_t count, time_t timeout)
     tv.tv_sec = timeout;
 
     FD_ZERO(&fdset);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
     FD_SET(fd, &fdset);
     if (select(fd + 1, &fdset, NULL, NULL, &tv) <= 0) {
         SPDLOG_DEBUG("select() Timeout");
