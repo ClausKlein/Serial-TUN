@@ -51,10 +51,7 @@ int write_n(int fd, char *buf, size_t len);
  */
 static inline int pipe_open(int *fd)
 {
-#ifndef SOCK_CLOEXEC
-    constexpr int SOCK_CLOEXEC(0);
-#endif
-    return socketpair(AF_UNIX, SOCK_STREAM, SOCK_CLOEXEC, fd);
+    return socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
 }
 
 /* Write frames to pipe */

@@ -207,22 +207,18 @@ int main(int argc, char *argv[])
 
     // Create threads
     pthread_t tun2serial, serial2tun;
-    int ret1, ret2;
-
     struct CommDevices threadParams;
     threadParams.tunFileDescriptor = tunFd;
     threadParams.serialPort = serialPort;
 
-    printf("Starting threads\n");
-    ret1 =
-        pthread_create(&tun2serial, NULL, tunToSerial, (void *)&threadParams);
-    ret2 =
-        pthread_create(&serial2tun, NULL, serialToTun, (void *)&threadParams);
+    puts("Starting threads");
+    pthread_create(&tun2serial, NULL, tunToSerial, (void *)&threadParams);
+    pthread_create(&serial2tun, NULL, serialToTun, (void *)&threadParams);
 
     pthread_join(tun2serial, NULL);
-    printf("Thread tun-to-network returned %d\n", ret1);
+    puts("Thread tun-to-network returned");
     pthread_join(serial2tun, NULL);
-    printf("Thread network-to-tun returned %d\n", ret2);
+    puts("Thread network-to-tun returned");
 
     return EXIT_SUCCESS;
 }
