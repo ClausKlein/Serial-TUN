@@ -15,3 +15,18 @@ see too:
 
  - http://jodies.de/ipcalc?host=172.29.250.192&mask1=28&mask2=29
 
+-------------------------------------------------------
+
+To build this cmake project simply use the makefile wrapper::
+
+  make setup
+  make check  # use clang-tidy
+  make format # use clang-format
+  make test
+  DESTIDR=/tmp/stagedir make install
+
+  # to create a test-coverage report:
+  BUILD_TYPE=Coverage make lcov
+
+
+extented by Claus Klein
