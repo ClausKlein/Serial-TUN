@@ -1,13 +1,12 @@
 #include "slip.h"
 
-enum slip_result slip_encode(const uint8_t *frame, size_t frameLength,
-                             uint8_t *output, size_t maxOutputSize,
-                             size_t *outputSize)
+enum slip_result slip_encode(const inBuffer_t &frame, size_t frameLength,
+                             outBuffer_t &output, size_t *outputSize)
 {
     size_t outputIndex = 0;
     for (size_t inIndex = 0; inIndex < frameLength; inIndex++) {
         // Check if we ran out of space on the output
-        if (maxOutputSize <= outputIndex) {
+        if (SLIP_OUT_FRAME_LENGTH <= outputIndex) {
             return SLIP_BUFFER_OVERFLOW;
         }
 
@@ -40,16 +39,15 @@ enum slip_result slip_encode(const uint8_t *frame, size_t frameLength,
     return SLIP_OK;
 }
 
-enum slip_result slip_decode(const uint8_t *encodedFrame, size_t frameLength,
-                             uint8_t *output, size_t maxOutputSize,
-                             size_t *outputSize)
+enum slip_result slip_decode(const inBuffer_t &encodedFrame, size_t frameLength,
+                             outBuffer_t &output, size_t *outputSize)
 {
     int invalidEscape = 0;
 
     size_t outputIndex = 0;
     for (size_t inIndex = 0; inIndex < frameLength; inIndex++) {
         // Check if we ran out of space on the output buffer
-        if (maxOutputSize <= outputIndex) {
+        if (SLIP_OUT_FRAME_LENGTH <= outputIndex) {
             return SLIP_BUFFER_OVERFLOW;
         }
 
@@ -66,8 +64,7 @@ enum slip_result slip_decode(const uint8_t *encodedFrame, size_t frameLength,
                 // Escape sequence invalid, complain on stderr
                 output[outputIndex] = SLIP_ESC;
                 invalidEscape = 1;
-                fprintf(stderr,
-                        "SLIP escape error! (Input bytes 0x%02x, 0x%02x)\n",
+                SPDLOG_ERROR("SLIP escape error! (Input bytes {:#04x}, {:#04x})",
                         inByte, encodedFrame[inIndex + 1]);
                 break;
             }

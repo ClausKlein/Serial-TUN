@@ -28,6 +28,7 @@ int main()
 
 #if __has_include(<experimental/array>)
     auto arr = std::experimental::make_array(1, 2, 3, 4, 5);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     assert(arr[0] == 1);
 
     int fd = tempfd("/tmp/test.XXXXXX");
@@ -47,7 +48,7 @@ int main()
 
     if (test == text) {
         std::cout << static_cast<const char *>(__func__) << std::endl; // OK
-        std::cout << __FUNCTION__ << std::endl; // FIXME same warning!
-        std::cout << __PRETTY_FUNCTION__ << std::endl; // FIXME same warning!
+        std::cout << static_cast<const char *>(__FUNCTION__) << std::endl;
+        std::cout << static_cast<const char *>(__PRETTY_FUNCTION__) << std::endl;
     }
 }

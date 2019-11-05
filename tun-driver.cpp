@@ -20,13 +20,14 @@ int tun_open_common(
     }
 
     // Interface request structure
-    struct ifreq ifr;
+    struct ifreq ifr{};
 
     // File descriptor
     int fileDescriptor;
 
     // Open the tun device, if it doesn't exists return the error
     const char *cloneDevice = "/dev/net/tun";
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
     if ((fileDescriptor = open(cloneDevice, O_RDWR | O_CLOEXEC)) < 0) {
         perror("open /dev/net/tun");
         return fileDescriptor;
@@ -34,16 +35,19 @@ int tun_open_common(
 
     // Initialize the ifreq structure with 0s and the set flags
     memset(&ifr, 0, sizeof(ifr));
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
     ifr.ifr_flags = (mode ? IFF_TUN : IFF_TAP) | IFF_NO_PI;
 
     // If a device name is passed we should add it to the ifreq struct
     // Otherwise the kernel will try to allocate the next available
     // device of the given type
     if (*dev) {
-        strncpy(ifr.ifr_name, dev, IF_NAMESIZE);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+        strncpy(static_cast<char *>(ifr.ifr_name), dev, IF_NAMESIZE);
     }
 
     // Ask the kernel to create the new device
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
     int err = ioctl(fileDescriptor, TUNSETIFF, &ifr);
     if (err < 0) {
         // If something went wrong close the file and return
@@ -54,7 +58,8 @@ int tun_open_common(
 
     // Write the device name back to the dev variable so the caller
     // can access it
-    strcpy(dev, ifr.ifr_name);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+    strcpy(dev, static_cast<const char *>(ifr.ifr_name));
 
     // Return the file descriptor
     return fileDescriptor;
@@ -72,17 +77,19 @@ int tun_open_common(
     char tunname[_POSIX_NAME_MAX];
 
     if (*dev) {
-        snprintf(tunname, sizeof(tunname), "/dev/%s", dev);
+        snprintf(static_cast<char *>(tunname), sizeof(tunname), "/dev/%s", dev);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
         return open(tunname, O_RDWR | O_CLOEXEC);
     }
 
     int err = 0;
     for (int i = 0; i < INT8_MAX; i++) {
         int fd;
-        snprintf(tunname, sizeof(tunname), "/dev/%s%d", (mode ? "tun" : "tap"),
-                 i);
+        snprintf(static_cast<char *>(tunname), sizeof(tunname), "/dev/%s%d",
+                 (mode ? "tun" : "tap"), i);
         /* Open device */
-        if ((fd = open(tunname, O_RDWR | O_CLOEXEC)) > 0) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+        if ((fd = open(static_cast<char *>(tunname), O_RDWR | O_CLOEXEC)) > 0) {
             strcpy(dev, tunname + 5); // NOLINT: offset 5 is OK! CK
             return fd;
         }

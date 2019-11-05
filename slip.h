@@ -5,8 +5,9 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstdio>
+#include "tun-driver.h"
+
+#include <array>
 
 enum
 {
@@ -14,6 +15,8 @@ enum
     SLIP_ESC = 0xDB,
     SLIP_ESC_END = 0xDC,
     SLIP_ESC_ESC = 0xDD,
+    SLIP_IN_FRAME_LENGTH = 2048,
+    SLIP_OUT_FRAME_LENGTH = 4098,
 };
 
 enum slip_result
@@ -23,28 +26,27 @@ enum slip_result
     SLIP_BUFFER_OVERFLOW = 2,
 };
 
+typedef std::array<uint8_t, SLIP_OUT_FRAME_LENGTH> outBuffer_t;
+typedef std::array<uint8_t, SLIP_IN_FRAME_LENGTH> inBuffer_t;
+
 /**
  * Encode a piece of data according to the SLIP standard
  * @param frame             Data to encode
  * @param frameLength       Data length
  * @param output            Where to store the encoded frame
- * @param maxOutputSize     Max output size
  * @param outputSize        Where to store output length
  * @return SLIP_OK for success, otherwise error code
  */
-enum slip_result slip_encode(const uint8_t *frame, size_t frameLength,
-                             uint8_t *output, size_t maxOutputSize,
-                             size_t *outputSize);
+enum slip_result slip_encode(const inBuffer_t &frame, size_t frameLength,
+                             outBuffer_t &output, size_t *outputSize);
 
 /**
  * Decode a SLIP packet
  * @param encodedFrame      Data to decode
  * @param frameLength       Data length
  * @param output            Where to store the decoded data
- * @param maxOutputSize     Max output size
  * @param outputSize        Where to store output length
  * @return SLIP_OK for success, otherwise error code
  */
-enum slip_result slip_decode(const uint8_t *encodedFrame, size_t frameLength,
-                             uint8_t *output, size_t maxOutputSize,
-                             size_t *outputSize);
+enum slip_result slip_decode(const inBuffer_t &encodedFrame, size_t frameLength,
+                             outBuffer_t &output, size_t *outputSize);

@@ -13,6 +13,9 @@
 // NOTE: as second! CK
 #include "spdlog/fmt/bin_to_hex.h"
 
+#define GSL_THROW_ON_CONTRACT_VIOLATION 1
+#include "gsl/gsl-lite.hpp"
+
 #include <fcntl.h>
 #include <net/if.h>
 #include <sys/socket.h>

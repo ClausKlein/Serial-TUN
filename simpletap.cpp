@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <iostream>
 #include <iterator>
 #include <memory>
 #include <thread>
@@ -76,8 +77,8 @@ void CommDevices::serialToTap()
             if (this->mode == VTUN_PIPE) {
                 // selftest only:
                 char pingMsg[] = "\x05\0TapPing";
-                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                 serialResult = sizeof(pingMsg);
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                 memcpy(inBuffer.data(), pingMsg, sizeof(pingMsg));
             }
 #else
@@ -258,7 +259,8 @@ int main(int argc, char *argv[])
             strncpy(adapterName, optarg, IF_NAMESIZE - 1);
             break;
         case 'd':
-            strncpy(serialDevice, optarg, sizeof(serialDevice) - 1);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            strncpy(static_cast<char*>(serialDevice), optarg, sizeof(serialDevice) - 1);
             break;
         case 'r':
             red_node = true;
@@ -270,15 +272,14 @@ int main(int argc, char *argv[])
             spdlog::set_level(spdlog::level::trace); // Set global log level
             break;
         default:
-            fprintf(stderr,
-                    "Usage: %s -i tun0 -d /dev/spidip2.0 [-r] [-p] [-v]\n",
-                    *argv);
+            std::cerr << "Usage: " << *argv
+                      << "s -i tun0 -d /dev/spidip2.0 [-r] [-p] [-v]" << std::endl;
             return EXIT_FAILURE;
         }
     }
 
     if (serialDevice[0] == '\0') {
-        fprintf(stderr, "Serial port required (-d /dev/name)\n");
+        std::cerr << "Serial port required (-d /dev/name)" << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -308,7 +309,8 @@ int main(int argc, char *argv[])
         (void)write_n(tapFd, pingMsg, sizeof(pingMsg));
     }
 
-    int serialFd = open(serialDevice, O_RDWR | O_CLOEXEC);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+    int serialFd = open(static_cast<char*>(serialDevice), O_RDWR | O_CLOEXEC);
     if (serialFd < 0) {
         SPDLOG_ERROR("open() error({}) {}", errno, strerror(errno));
         if (mode != VTUN_PIPE) {
@@ -326,6 +328,7 @@ int main(int argc, char *argv[])
 
     // register signal handler
     struct sigaction sa = {};
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
     sa.sa_handler = signal_handler;
     sigaction(SIGHUP, &sa, NULL);  // terminal line hangup (1)
     sigaction(SIGQUIT, &sa, NULL); // quit program (3)
