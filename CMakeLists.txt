@@ -93,7 +93,6 @@ endif()
 
 add_executable(simpletap simpletap.cpp ExtensionPoint.h tun-lib.cpp tun-driver.cpp tun-driver.h)
 target_link_libraries(simpletap PRIVATE gsl::gsl-lite spdlog::spdlog_header_only Threads::Threads)
-set_target_properties(simpletap PROPERTIES CXX_STANDARD 14)
 
 # install options
 option(SERIAL_TUN_INSTALL "Generate the install target." ${SERIAL_TUN_MASTER_PROJECT})
@@ -131,9 +130,11 @@ if(SERIAL_TUN_BUILD_TESTS)
 
     add_executable(test_slip test_slip.cpp slip.cpp slip.h)
     target_link_libraries(test_slip PRIVATE doctest::doctest)
-    set_target_properties(test_slip PROPERTIES CXX_STANDARD 14)
     add_test(NAME test_slip COMMAND test_slip)
 
+    add_executable(test_to_array test_to_array.cpp)
+    set_target_properties(test_slip PROPERTIES CXX_STANDARD 20)
+    add_test(NAME test_to_array COMMAND test_to_array)
 
     # test coverage options
     option(USE_LCOV "Use GNU Test Coverage framework" OFF)

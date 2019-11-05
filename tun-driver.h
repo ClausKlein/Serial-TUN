@@ -7,6 +7,8 @@
 #    define SPDLOG_ACTIVE_LEVEL 0 // NOLINT
 #endif
 
+#define SPDLOG_FUNCTION static_cast<const char *>(__func__)
+
 #include "spdlog/spdlog.h"
 // NOTE: as second! CK
 #include "spdlog/fmt/bin_to_hex.h"

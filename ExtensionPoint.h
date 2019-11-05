@@ -32,6 +32,7 @@ protected:
     ExtensionPoint() = default;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class Pipe : public ExtensionPoint // FIXME , private boost::noncopyable
 {
 public:
