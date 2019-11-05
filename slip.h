@@ -7,7 +7,7 @@
 
 #include "tun-driver.h"
 
-#include <array>
+#include <vector>
 
 enum
 {
@@ -26,8 +26,8 @@ enum slip_result
     SLIP_BUFFER_OVERFLOW = 2,
 };
 
-typedef std::array<uint8_t, SLIP_OUT_FRAME_LENGTH> outBuffer_t;
-typedef std::array<uint8_t, SLIP_IN_FRAME_LENGTH> inBuffer_t;
+typedef gsl::span<uint8_t> inBuffer_t;
+typedef std::vector<uint8_t> Buffer_t;
 
 /**
  * Encode a piece of data according to the SLIP standard
@@ -38,7 +38,7 @@ typedef std::array<uint8_t, SLIP_IN_FRAME_LENGTH> inBuffer_t;
  * @return SLIP_OK for success, otherwise error code
  */
 enum slip_result slip_encode(const inBuffer_t &frame, size_t frameLength,
-                             outBuffer_t &output, size_t *outputSize);
+                             Buffer_t &output, size_t *outputSize);
 
 /**
  * Decode a SLIP packet
@@ -49,4 +49,4 @@ enum slip_result slip_encode(const inBuffer_t &frame, size_t frameLength,
  * @return SLIP_OK for success, otherwise error code
  */
 enum slip_result slip_decode(const inBuffer_t &encodedFrame, size_t frameLength,
-                             outBuffer_t &output, size_t *outputSize);
+                             Buffer_t &output, size_t *outputSize);

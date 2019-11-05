@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <unistd.h>
+#include <vector>
 
 #if __has_include(<experimental/array>)
 #    include <experimental/array>
@@ -22,6 +23,18 @@ template <std::size_t N> int tempfd(char const (&tmpl)[N])
     return fd;
 }
 #endif
+
+template <typename T>
+std::ostream &operator<<(std::ostream &s, const std::vector<T> &v)
+{
+    s.put('[');
+    char comma[3] = {'\0', ' ', '\0'};
+    for (const auto &e : v) {
+        s << comma << e; // NOLINT
+        comma[0] = ',';
+    }
+    return s << ']';
+}
 
 int main()
 {
@@ -49,6 +62,11 @@ int main()
     if (test == text) {
         std::cout << static_cast<const char *>(__func__) << std::endl; // OK
         std::cout << static_cast<const char *>(__FUNCTION__) << std::endl;
-        std::cout << static_cast<const char *>(__PRETTY_FUNCTION__) << std::endl;
+        std::cout << static_cast<const char *>(__PRETTY_FUNCTION__)
+                  << std::endl;
     }
+
+    // words is {"Mo", "Mo", "Mo", "Mo", "Mo", "Mo"}
+    std::vector<std::string> words(len, "Mo");
+    std::cout << "words: " << words << '\n';
 }

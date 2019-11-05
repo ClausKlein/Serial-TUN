@@ -260,7 +260,8 @@ int main(int argc, char *argv[])
             break;
         case 'd':
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-            strncpy(static_cast<char*>(serialDevice), optarg, sizeof(serialDevice) - 1);
+            strncpy(static_cast<char *>(serialDevice), optarg,
+                    sizeof(serialDevice) - 1);
             break;
         case 'r':
             red_node = true;
@@ -273,7 +274,8 @@ int main(int argc, char *argv[])
             break;
         default:
             std::cerr << "Usage: " << *argv
-                      << "s -i tun0 -d /dev/spidip2.0 [-r] [-p] [-v]" << std::endl;
+                      << "s -i tun0 -d /dev/spidip2.0 [-r] [-p] [-v]"
+                      << std::endl;
             return EXIT_FAILURE;
         }
     }
@@ -310,7 +312,7 @@ int main(int argc, char *argv[])
     }
 
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
-    int serialFd = open(static_cast<char*>(serialDevice), O_RDWR | O_CLOEXEC);
+    int serialFd = open(static_cast<char *>(serialDevice), O_RDWR | O_CLOEXEC);
     if (serialFd < 0) {
         SPDLOG_ERROR("open() error({}) {}", errno, strerror(errno));
         if (mode != VTUN_PIPE) {

@@ -20,7 +20,7 @@ int tun_open_common(
     }
 
     // Interface request structure
-    struct ifreq ifr{};
+    struct ifreq ifr = {};
 
     // File descriptor
     int fileDescriptor;
@@ -77,14 +77,16 @@ int tun_open_common(
     char tunname[_POSIX_NAME_MAX];
 
     if (*dev) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
         snprintf(static_cast<char *>(tunname), sizeof(tunname), "/dev/%s", dev);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
-        return open(tunname, O_RDWR | O_CLOEXEC);
+        return open(static_cast<char *>(tunname), O_RDWR | O_CLOEXEC);
     }
 
     int err = 0;
     for (int i = 0; i < INT8_MAX; i++) {
         int fd;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
         snprintf(static_cast<char *>(tunname), sizeof(tunname), "/dev/%s%d",
                  (mode ? "tun" : "tap"), i);
         /* Open device */

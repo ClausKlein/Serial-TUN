@@ -1,5 +1,4 @@
 #include "slip.h"
-#include "tun-driver.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -36,8 +35,8 @@ static void *serialToTun(void *ptr)
 
     // Create two buffers, one to store raw data from the serial port and
     // one to store SLIP frames
-    inBuffer_t inBuffer;
-    outBuffer_t outBuffer;
+    Buffer_t inBuffer(SLIP_IN_FRAME_LENGTH);
+    Buffer_t outBuffer(SLIP_OUT_FRAME_LENGTH);
     size_t outSize = 0;
     int inIndex = 0;
 
@@ -99,8 +98,8 @@ static void *tunToSerial(void *ptr)
     struct sp_port *serialPort = args->serialPort;
 
     // Create TUN buffer
-    inBuffer_t inBuffer;
-    outBuffer_t outBuffer;
+    Buffer_t inBuffer(SLIP_IN_FRAME_LENGTH);
+    Buffer_t outBuffer(SLIP_OUT_FRAME_LENGTH);
 
     // Incoming byte count
     ssize_t count;
@@ -125,8 +124,8 @@ static void *tunToSerial(void *ptr)
         serialResult =
             sp_nonblocking_write(serialPort, outBuffer.data(), encodedLength);
         if (serialResult < 0) {
-            std::cerr << "Could not send data to serial port: " <<
-                    serialResult << std::endl;
+            std::cerr << "Could not send data to serial port: " << serialResult
+                      << std::endl;
         }
     }
 
@@ -143,7 +142,8 @@ int main(int argc, char *argv[])
             strncpy(static_cast<char *>(adapterName), optarg, IFNAMSIZ - 1);
             break;
         case 'p':
-            strncpy(static_cast<char *>(serialPortName), optarg, sizeof(serialPortName) - 1);
+            strncpy(static_cast<char *>(serialPortName), optarg,
+                    sizeof(serialPortName) - 1);
             break;
         case 'b':
             serialBaudRate = strtoul(optarg, NULL, 10);
@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
 
     // Create threads
     pthread_t tun2serial, serial2tun;
-    struct CommDevices threadParams{};
+    struct CommDevices threadParams = {};
     threadParams.tunFileDescriptor = tunFd;
     threadParams.serialPort = serialPort;
 
