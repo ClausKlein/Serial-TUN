@@ -17,22 +17,6 @@ include(build_options)
 # search required packages and libs
 #---------------------------------------------------------------------------------------
 find_package(Threads REQUIRED)
-find_library(SerialPort_lib serialport)
-find_file(SerialPort_header libserialport.h)
-
-if(NOT CMAKE_BUILD_TYPE STREQUAL "Coverage")
-    if(SerialPort_lib)
-        set(SOURCE_FILES serial_tun.cpp tun-driver.cpp tun-driver.h
-            ${SerialPort_header} slip.cpp slip.h
-        )
-        add_executable(serial_tun ${SOURCE_FILES})
-        target_link_libraries(serial_tun ${SerialPort_lib} Threads::Threads)
-    endif()
-
-    if(LINUX)
-        add_executable(simpletun simpletun.cpp)
-    endif()
-endif()
 
 
 #---------------------------------------------------------------------------------------
@@ -73,8 +57,8 @@ if(SERIAL_TUN_MASTER_PROJECT)
         fetchcontent_makeavailable(gsl-lite)
     endif()
 
-    find_package(spdlog 1.4.2 QUIET)
-    if(NOT TARGET spdlog::spdlog_header_only)
+    find_package(spdlog 1.4 QUIET)
+    if(NOT TARGET spdlog::spdlog)
         fetchcontent_declare(
             spdlog
             GIT_REPOSITORY https://github.com/gabime/spdlog.git
@@ -83,7 +67,7 @@ if(SERIAL_TUN_MASTER_PROJECT)
         fetchcontent_makeavailable(spdlog)
     endif()
 endif()
-if(NOT TARGET spdlog::spdlog_header_only)
+if(NOT TARGET spdlog::spdlog)
     find_package(spdlog 1.4.2 REQUIRED)
 endif()
 if(NOT TARGET gsl::gsl-lite)
@@ -91,8 +75,25 @@ if(NOT TARGET gsl::gsl-lite)
 endif()
 
 
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Coverage")
+    find_file(SerialPort_header libserialport.h)
+    find_library(SerialPort_lib serialport)
+    if(SerialPort_lib)
+        set(SOURCE_FILES serial_tun.cpp tun-driver.cpp tun-driver.h
+            ${SerialPort_header} slip.cpp slip.h
+        )
+        add_executable(serial_tun ${SOURCE_FILES})
+        target_link_libraries(serial_tun ${SerialPort_lib} gsl::gsl-lite spdlog::spdlog Threads::Threads)
+    endif()
+
+    if(LINUX)
+        add_executable(simpletun simpletun.cpp)
+    endif()
+endif()
+
+
 add_executable(simpletap simpletap.cpp ExtensionPoint.h tun-lib.cpp tun-driver.cpp tun-driver.h)
-target_link_libraries(simpletap PRIVATE gsl::gsl-lite spdlog::spdlog_header_only Threads::Threads)
+target_link_libraries(simpletap PRIVATE gsl::gsl-lite spdlog::spdlog Threads::Threads)
 
 # install options
 option(SERIAL_TUN_INSTALL "Generate the install target." ${SERIAL_TUN_MASTER_PROJECT})
@@ -110,7 +111,7 @@ option(SERIAL_TUN_BUILD_TESTS "Build tests" ${SERIAL_TUN_MASTER_PROJECT})
 if(SERIAL_TUN_BUILD_TESTS)
     enable_testing()
 
-    find_package(doctest 2.3.5 QUIET)
+    find_package(doctest 2.3 QUIET)
     if(NOT TARGET doctest::doctest)
         fetchcontent_declare(
             doctest
@@ -129,11 +130,12 @@ if(SERIAL_TUN_BUILD_TESTS)
     )
 
     add_executable(test_slip test_slip.cpp slip.cpp slip.h)
-    target_link_libraries(test_slip PRIVATE doctest::doctest)
+    target_link_libraries(test_slip PRIVATE doctest::doctest gsl::gsl-lite spdlog::spdlog)
     add_test(NAME test_slip COMMAND test_slip)
 
     add_executable(test_to_array test_to_array.cpp)
-    set_target_properties(test_slip PROPERTIES CXX_STANDARD 20)
+    set_target_properties(test_to_array PROPERTIES CXX_STANDARD 20)
+    target_link_libraries(test_to_array PRIVATE doctest::doctest)
     add_test(NAME test_to_array COMMAND test_to_array)
 
     # test coverage options

@@ -1,3 +1,4 @@
+#include "tun-driver.h"
 #include "slip.h"
 
 #include <cstdio>
