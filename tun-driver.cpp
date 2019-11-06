@@ -75,7 +75,6 @@ int tun_open_common(
     }
 
     char tunname[_POSIX_NAME_MAX];
-
     if (*dev) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
         snprintf(static_cast<char *>(tunname), sizeof(tunname), "/dev/%s", dev);
@@ -108,4 +107,5 @@ int tun_open_common(
 
     return -1;
 }
+
 #endif

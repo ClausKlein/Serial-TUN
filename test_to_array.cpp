@@ -7,9 +7,9 @@
 #include <vector>
 
 #if __has_include(<experimental/array>)
-#    include <experimental/array>
 #    include <cstdio>
 #    include <cstdlib>
+#    include <experimental/array>
 #    include <unistd.h>
 
 // mkstemp(3) that works
@@ -73,7 +73,7 @@ TEST_CASE("test_vector")
 
     // words is {"Mo", "Mo", "Mo", "Mo", "Mo", "Mo"}
     std::vector<std::string> words(size, "Mo");
-    for(const auto w : words) {
+    for (const auto &w : words) {
         CHECK(w == "Mo");
     }
 }

@@ -1,5 +1,5 @@
-#include "tun-driver.h"
 #include "slip.h"
+#include "tun-driver.h"
 
 #include <cstdio>
 #include <cstdlib>
