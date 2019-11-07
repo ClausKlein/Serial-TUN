@@ -2,7 +2,7 @@
 
 #include "tun-driver.h"
 
-// FIXME #include <boost/core/noncopyable.hpp>
+// XXX #include <boost/core/noncopyable.hpp>
 
 #include <array>
 #include <cerrno>
@@ -33,7 +33,7 @@ protected:
 };
 
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
-class Pipe : public ExtensionPoint // FIXME , private boost::noncopyable
+class Pipe : public ExtensionPoint // XXX , private boost::noncopyable
 {
 public:
     Pipe()

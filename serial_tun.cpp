@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <libserialport.h>
 #include <pthread.h>
 
@@ -28,15 +29,15 @@ static void *tunToSerial(void *ptr);
 static void *serialToTun(void *ptr)
 {
     // Grab thread parameters
-    struct CommDevices *args = (struct CommDevices *)ptr;
+    struct CommDevices *args = static_cast<struct CommDevices *>(ptr);
 
     int tunFd = args->tunFileDescriptor;
     struct sp_port *serialPort = args->serialPort;
 
     // Create two buffers, one to store raw data from the serial port and
     // one to store SLIP frames
-    unsigned char inBuffer[4096];
-    unsigned char outBuffer[4096] = {0};
+    Buffer_t inBuffer(SLIP_IN_FRAME_LENGTH);
+    Buffer_t outBuffer(SLIP_OUT_FRAME_LENGTH);
     size_t outSize = 0;
     int inIndex = 0;
 
@@ -61,22 +62,21 @@ static void *serialToTun(void *ptr)
             sp_blocking_read(serialPort, &inBuffer[inIndex], count, 0);
 
         if (serialResult < 0) {
-            fprintf(stderr, "Serial error! %d\n", serialResult);
+            std::cerr << "Serial error! " << serialResult << std::endl;
         } else {
             // We need to check if there is an SLIP_END sequence in the new
             // bytes
             for (int i = 0; i < serialResult; i++) {
                 if (inBuffer[inIndex] == SLIP_END) {
                     // Decode the packet that is marked by SLIP_END
-                    slip_decode(inBuffer, inIndex, outBuffer, sizeof(outBuffer),
-                                &outSize);
+                    slip_decode(inBuffer, inIndex, outBuffer, &outSize);
 
                     // Write the packet to the virtual interface
-                    write(tunFd, outBuffer, outSize);
+                    write(tunFd, outBuffer.data(), outSize);
 
                     // Copy the remaining data (belonging to the next packet)
                     // to the start of the buffer
-                    memcpy(inBuffer, &inBuffer[inIndex + 1],
+                    memcpy(inBuffer.data(), &inBuffer[inIndex + 1],
                            serialResult - i - 1);
                     inIndex = serialResult - i - 1;
                     break;
@@ -93,14 +93,14 @@ static void *serialToTun(void *ptr)
 static void *tunToSerial(void *ptr)
 {
     // Grab thread parameters
-    struct CommDevices *args = (struct CommDevices *)ptr;
+    struct CommDevices *args = static_cast<struct CommDevices *>(ptr);
 
     int tunFd = args->tunFileDescriptor;
     struct sp_port *serialPort = args->serialPort;
 
     // Create TUN buffer
-    unsigned char inBuffer[2048];
-    unsigned char outBuffer[4096];
+    Buffer_t inBuffer(SLIP_IN_FRAME_LENGTH);
+    Buffer_t outBuffer(SLIP_OUT_FRAME_LENGTH);
 
     // Incoming byte count
     ssize_t count;
@@ -112,22 +112,21 @@ static void *tunToSerial(void *ptr)
     enum sp_return serialResult;
 
     while (true) {
-        count = read(tunFd, inBuffer, sizeof(inBuffer));
+        count = read(tunFd, inBuffer.data(), inBuffer.size());
         if (count < 0) {
-            fprintf(stderr, "Could not read from interface\n");
+            std::cerr << "Could not read from interface\n";
             continue;
         }
 
         // Encode data
-        slip_encode(inBuffer, (size_t)count, outBuffer, sizeof(outBuffer),
-                    &encodedLength);
+        slip_encode(inBuffer, (size_t)count, outBuffer, &encodedLength);
 
         // Write to serial port
         serialResult =
-            sp_nonblocking_write(serialPort, outBuffer, encodedLength);
+            sp_nonblocking_write(serialPort, outBuffer.data(), encodedLength);
         if (serialResult < 0) {
-            fprintf(stderr, "Could not send data to serial port: %d\n",
-                    serialResult);
+            std::cerr << "Could not send data to serial port: " << serialResult
+                      << std::endl;
         }
     }
 
@@ -141,38 +140,39 @@ int main(int argc, char *argv[])
     while ((param = getopt(argc, argv, "i:p:b:")) > 0) {
         switch (param) {
         case 'i':
-            strncpy(adapterName, optarg, IFNAMSIZ - 1);
+            strncpy(static_cast<char *>(adapterName), optarg, IFNAMSIZ - 1);
             break;
         case 'p':
-            strncpy(serialPortName, optarg, sizeof(serialPortName) - 1);
+            strncpy(static_cast<char *>(serialPortName), optarg,
+                    sizeof(serialPortName) - 1);
             break;
         case 'b':
             serialBaudRate = strtoul(optarg, NULL, 10);
             break;
         default:
-            fprintf(stderr, "Unknown parameter %c\n", param);
+            std::cerr << "Unknown parameter " << param << std::endl;
             break;
         }
     }
 
     if (adapterName[0] == '\0') {
-        fprintf(stderr, "Adapter name required (-i)\n");
+        std::cerr << "Adapter name required (-i)\n";
         return EXIT_FAILURE;
     }
     if (serialPortName[0] == '\0') {
-        fprintf(stderr, "Serial port required (-p)\n");
+        std::cerr << "Serial port required (-p)\n";
         return EXIT_FAILURE;
     }
 
-    int tunFd = tun_open_common(adapterName, VTUN_P2P);
+    int tunFd = tun_open_common(static_cast<char *>(adapterName), VTUN_P2P);
     if (tunFd < 0) {
-        fprintf(stderr, "Could not open /dev/net/tun\n");
+        std::cerr << "Could not open /dev/net/tun\n";
         return EXIT_FAILURE;
     }
 
     // Configure & open serial port
     struct sp_port *serialPort;
-    sp_get_port_by_name(serialPortName, &serialPort);
+    sp_get_port_by_name(static_cast<char *>(serialPortName), &serialPort);
 
     enum sp_return status = sp_open(serialPort, SP_MODE_READ_WRITE);
 
@@ -184,22 +184,22 @@ int main(int argc, char *argv[])
     sp_set_flowcontrol(serialPort, SP_FLOWCONTROL_NONE);
 
     if (status < 0) {
-        fprintf(stderr, "Could not open serial port: ");
+        std::cerr << "Could not open serial port: ";
         switch (status) {
         case SP_ERR_ARG:
-            fprintf(stderr, "Invalid argument\n");
+            std::cerr << "Invalid argument\n";
             break;
         case SP_ERR_FAIL:
-            fprintf(stderr, "System error\n");
+            std::cerr << "System error\n";
             break;
         case SP_ERR_MEM:
-            fprintf(stderr, "Memory allocation error\n");
+            std::cerr << "Memory allocation error\n";
             break;
         case SP_ERR_SUPP:
-            fprintf(stderr, "Operation not supported by device\n");
+            std::cerr << "Operation not supported by device\n";
             break;
         default:
-            fprintf(stderr, "Unknown error\n");
+            std::cerr << "Unknown error\n";
             break;
         }
         return EXIT_FAILURE;
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
 
     // Create threads
     pthread_t tun2serial, serial2tun;
-    struct CommDevices threadParams;
+    struct CommDevices threadParams = {};
     threadParams.tunFileDescriptor = tunFd;
     threadParams.serialPort = serialPort;
 

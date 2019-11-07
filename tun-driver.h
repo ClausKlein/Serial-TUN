@@ -7,11 +7,14 @@
 #    define SPDLOG_ACTIVE_LEVEL 0 // NOLINT
 #endif
 
-#define SPDLOG_FUNCTION static_cast<const char *>(__func__)
+#define SPDLOG_FUNCTION static_cast<const char *>(__func__) // NOLINT
 
 #include "spdlog/spdlog.h"
 // NOTE: as second! CK
 #include "spdlog/fmt/bin_to_hex.h"
+
+#define GSL_THROW_ON_CONTRACT_VIOLATION 1 // NOLINT
+#include "gsl/gsl-lite.hpp"
 
 #include <fcntl.h>
 #include <net/if.h>
