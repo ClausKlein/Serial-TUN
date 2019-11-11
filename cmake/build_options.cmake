@@ -81,3 +81,10 @@ if(USE_OUTPUT_PATH)
     # -----------------------------------------------------------------------
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 endif()
+
+
+# test coverage options
+option(USE_LCOV "Use GNU Test Coverage framework" OFF)
+if(USE_LCOV)
+    set(CMAKE_BUILD_TYPE "Coverage" CACHE STRING "build for lcov" FORCE)
+endif()

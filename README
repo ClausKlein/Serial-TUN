@@ -26,7 +26,7 @@ To build this cmake project simply use the makefile wrapper::
   DESTIDR=/tmp/stagedir make install
 
   # to create a test-coverage report:
-  BUILD_TYPE=Coverage make lcov
+  BUILD_TYPE=Coverage make all lcov
 
 
 extented by Claus Klein
