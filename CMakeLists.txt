@@ -138,12 +138,8 @@ if(SERIAL_TUN_BUILD_TESTS)
     target_link_libraries(test_to_array PRIVATE doctest::doctest)
     add_test(NAME test_to_array COMMAND test_to_array)
 
-    # test coverage options
-    option(USE_LCOV "Use GNU Test Coverage framework" OFF)
-    if(USE_LCOV)
-        set(CMAKE_BUILD_TYPE "Coverage" CACHE STRING "build for lcov" FORCE)
-    endif()
 
+    # test coverage option
     if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
         include(CodeCoverage)
 
