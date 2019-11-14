@@ -39,11 +39,11 @@ GENERATOR?=Ninja
 ##################################################
 BUILD_DIR:=../.build-$(PROJECT_NAME)-$(BUILD_TYPE)
 ifeq ($(BUILD_TYPE),Coverage)
-    USE_LOV=ON
+    USE_LOCV=ON
     CC:=/usr/bin/gcc
     CXX:=/usr/bin/g++
 else
-    USE_LOV=OFF
+    USE_LOCV=OFF
 endif
 
 all: setup .configure-$(BUILD_TYPE)
@@ -62,7 +62,7 @@ setup: $(BUILD_DIR) .clang-tidy compile_commands.json
 
 .configure-$(BUILD_TYPE): CMakeLists.txt
 	cd $(BUILD_DIR) && cmake -G $(GENERATOR) -Wdeprecated -Wdev \
-      -DUSE_LCOV=$(USE_LOV) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+      -DUSE_LCOV=$(USE_LOCV) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
       -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX} $(CURDIR)
 	touch $@
 
