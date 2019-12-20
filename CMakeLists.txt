@@ -33,19 +33,6 @@ if(NOT SERIAL_TUN_MASTER_PROJECT)
 endif()
 
 
-include(FetchContent)
-if(CMAKE_VERSION VERSION_LESS "3.14")
-    function(fetchcontent_makeavailable name)
-        fetchcontent_getproperties(${name})
-        if(NOT ${name}_POPULATED)
-            fetchcontent_populate(${name})
-            add_subdirectory(${${name}_SOURCE_DIR} ${${name}_BINARY_DIR})
-            include_directories(${${name}_SOURCE_DIR}/include)
-        endif()
-    endfunction()
-endif()
-
-
 if(SERIAL_TUN_MASTER_PROJECT)
     find_package(gsl-lite 0.34.0 QUIET)
     if(NOT TARGET gsl::gsl-lite)
@@ -139,7 +126,7 @@ if(SERIAL_TUN_BUILD_TESTS)
     add_test(NAME test_to_array COMMAND test_to_array)
 
 
-    # test coverage option
+    # test coverage build type
     if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
         include(CodeCoverage)
 
@@ -155,9 +142,4 @@ if(SERIAL_TUN_BUILD_TESTS)
             #NO YET! OUTDIR ${CMAKE_SOURCE_DIR}/lcov   # Name of output directory.
         )
     endif()
-endif()
-
-if(SERIAL_TUN_MASTER_PROJECT)
-    include(CMakePrintSystemInformation)
-    message("CMAKE_CXX_LIBRARY_ARCHITECTURE ${CMAKE_CXX_LIBRARY_ARCHITECTURE}")
 endif()

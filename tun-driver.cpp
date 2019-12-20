@@ -43,7 +43,7 @@ int tun_open_common(
     // device of the given type
     if (*dev) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
-        strncpy(static_cast<char *>(ifr.ifr_name), dev, IF_NAMESIZE);
+        strncpy(static_cast<char *>(ifr.ifr_name), dev, IF_NAMESIZE - 1);
     }
 
     // Ask the kernel to create the new device

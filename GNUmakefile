@@ -25,23 +25,40 @@ CHECKS?='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoi
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
+# prevent hard config of find_package(asio 1.14.1 CONFIG CMAKE_FIND_ROOT_PATH_BOTH)
+ifeq (NO${CROSS_COMPILE},NO)
+    ##XXX CC:=/opt/local/bin/clang
+    ##XXX CXX:=/opt/local/bin/clang++
 
-#XXX CXX:=$(shell which clang++)
-## CC:=/opt/local/bin/clang
-## CXX:=/opt/local/bin/clang++
-#NO! BUILD_TYPE:=Coverage
-# BUILD_TYPE?=Debug
+    # NOTE: Do not uses with DESTDIR! CMAKE_INSTALL_PREFIX?=/
+    DESTDIR?=/tmp/staging/$(PROJECT_NAME)
+    export DESTDIR
+
+    CMAKE_STAGING_PREFIX?=/usr/local
+    CMAKE_PREFIX_PATH?="${CMAKE_STAGING_PREFIX};/opt/local;/usr"
+else
+    CMAKE_STAGING_PREFIX?=/opt/sdhr/SDHR/staging/imx8m-sdhr/develop
+    CMAKE_PREFIX_PATH?="${CMAKE_STAGING_PREFIX};${OECORE_TARGET_SYSROOT}"
+endif
+
+# NOTE: use
+#NO!    BUILD_TYPE=Coverage make lcov
+BUILD_TYPE?=Debug
 BUILD_TYPE?=Release
 # GENERATOR:=Xcode
 GENERATOR?=Ninja
 
 # end of config part
 ##################################################
-BUILD_DIR:=../.build-$(PROJECT_NAME)-$(BUILD_TYPE)
+
+
+BUILD_DIR:=../.build-$(PROJECT_NAME)-${CROSS_COMPILE}$(BUILD_TYPE)
 ifeq ($(BUILD_TYPE),Coverage)
     USE_LOCV=ON
-    CC:=/usr/bin/gcc
-    CXX:=/usr/bin/g++
+    ifeq (NO${CROSS_COMPILE},NO)
+        CC:=/usr/bin/gcc
+        CXX:=/usr/bin/g++
+    endif
 else
     USE_LOCV=OFF
 endif
@@ -63,6 +80,8 @@ setup: $(BUILD_DIR) .clang-tidy compile_commands.json
 .configure-$(BUILD_TYPE): CMakeLists.txt
 	cd $(BUILD_DIR) && cmake -G $(GENERATOR) -Wdeprecated -Wdev \
       -DUSE_LCOV=$(USE_LOCV) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+      -DCMAKE_PREFIX_PATH=$(CMAKE_PREFIX_PATH) \
+      -DCMAKE_STAGING_PREFIX=$(CMAKE_STAGING_PREFIX) \
       -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX} $(CURDIR)
 	touch $@
 

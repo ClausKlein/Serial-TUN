@@ -2,6 +2,7 @@
 #include <doctest/doctest.h>
 
 #include <array>
+#include <cassert>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -37,7 +38,7 @@ TEST_CASE("Make_array")
     CHECK(err == 0);
 
     // C++ N4687: static const char __func__[] = "function-name";
-    puts(__func__); // warning: do not implicitly decay an array into a pointer;
+    assert(err == 0); // warning: do not implicitly decay an array into a pointer;
 }
 #endif
 
